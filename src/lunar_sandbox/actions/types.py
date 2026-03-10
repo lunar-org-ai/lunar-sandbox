@@ -123,6 +123,9 @@ class TraceEvent(BaseModel):
         source: Origin of the action ("api" or "shell").
         episode_id: ID of the containing episode.
         sandbox_id: ID of the sandbox that executed the action.
+        token_usage: Tokens consumed by agent for this action (optional).
+        cost_usd: Cost in USD for this action (optional).
+        cpu_time_ms: CPU time in milliseconds, host-side best-effort.
     """
 
     seq: int
@@ -135,6 +138,9 @@ class TraceEvent(BaseModel):
     source: str = "api"
     episode_id: str = ""
     sandbox_id: str = ""
+    token_usage: int | None = None
+    cost_usd: float | None = None
+    cpu_time_ms: float = 0.0
 
 
 # Per-action timeout defaults in seconds.
