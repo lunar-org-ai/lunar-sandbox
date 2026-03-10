@@ -3,19 +3,19 @@
 Public API::
 
     from lunar_sandbox.episode import (
-        EpisodeOutcome,
-        EpisodePhase,
-        EpisodeState,
+        # State machine
+        EpisodeOutcome, EpisodePhase, EpisodeState, VALID_TRANSITIONS,
+        # Result
         EpisodeResult,
-        VALID_TRANSITIONS,
-        score_by_test,
-        score_by_script,
-        score_by_parser,
-        run_scoring,
+        # Scoring
+        score_by_test, score_by_script, score_by_parser, run_scoring,
+        # Runner
+        EpisodeRunner,
     )
 """
 
 from lunar_sandbox.episode.result import EpisodeResult
+from lunar_sandbox.episode.runner import EpisodeRunner
 from lunar_sandbox.episode.scoring import (
     run_scoring,
     score_by_parser,
@@ -30,13 +30,18 @@ from lunar_sandbox.episode.state import (
 )
 
 __all__ = [
+    # State machine
     "EpisodeOutcome",
     "EpisodePhase",
-    "EpisodeResult",
     "EpisodeState",
     "VALID_TRANSITIONS",
+    # Result
+    "EpisodeResult",
+    # Scoring
     "run_scoring",
     "score_by_parser",
     "score_by_script",
     "score_by_test",
+    # Runner
+    "EpisodeRunner",
 ]
