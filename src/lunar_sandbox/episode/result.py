@@ -41,6 +41,7 @@ class EpisodeResult:
     fingerprint: str = ""
     started_at: float = 0.0
     ended_at: float = 0.0
+    jsonl_path: str = ""
 
     def is_success(self) -> bool:
         """Return True if the episode completed successfully with a positive score."""
@@ -74,6 +75,7 @@ class EpisodeResult:
             "fingerprint": self.fingerprint,
             "started_at": self.started_at,
             "ended_at": self.ended_at,
+            "jsonl_path": self.jsonl_path,
         }
 
     @classmethod
@@ -86,6 +88,7 @@ class EpisodeResult:
         sandbox_id: str = "",
         fingerprint: str = "",
         trace_events: list[Any] | None = None,
+        jsonl_path: str = "",
     ) -> EpisodeResult:
         """Construct an :class:`EpisodeResult` from an :class:`EpisodeState`.
 
@@ -101,6 +104,8 @@ class EpisodeResult:
             sandbox_id: Identifier of the sandbox used.
             fingerprint: Content fingerprint of the sandbox.
             trace_events: List of trace event dicts.
+            jsonl_path: Path to the JSONL trajectory file (empty when
+                no trajectory was captured).
 
         Returns:
             A fully populated :class:`EpisodeResult`.
@@ -126,4 +131,5 @@ class EpisodeResult:
             fingerprint=fingerprint,
             started_at=state.started_at,
             ended_at=state.ended_at if state.ended_at is not None else 0.0,
+            jsonl_path=jsonl_path,
         )
