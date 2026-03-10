@@ -454,6 +454,222 @@ class TrajectoryStore:
             row = self._conn.execute("SELECT COUNT(*) FROM episodes").fetchone()
         return row[0]
 
+    # -- export --------------------------------------------------------------
+
+    def _get_export_data(
+        self,
+        *,
+        episode_ids: list[str] | None = None,
+        task_name: str | None = None,
+        min_score: float | None = None,
+        max_score: float | None = None,
+        start_time: float | None = None,
+        end_time: float | None = None,
+    ) -> list[dict[str, Any]]:
+        """Shared helper: filter episodes, fetch their steps, enrich with episode metadata.
+
+        Returns a flat list of step dicts, each enriched with ``score`` and
+        ``task_name`` from the parent episode.
+        """
+        assert self._conn is not None  # noqa: S101
+
+        # Build episode filter
+        clauses: list[str] = []
+        params: list[Any] = []
+
+        if episode_ids is not None:
+            placeholders = ", ".join("?" for _ in episode_ids)
+            clauses.append(f"e.episode_id IN ({placeholders})")
+            params.extend(episode_ids)
+        if task_name is not None:
+            clauses.append("e.task_name = ?")
+            params.append(task_name)
+        if min_score is not None:
+            clauses.append("e.score >= ?")
+            params.append(min_score)
+        if max_score is not None:
+            clauses.append("e.score <= ?")
+            params.append(max_score)
+        if start_time is not None:
+            clauses.append("e.started_at >= ?")
+            params.append(start_time)
+        if end_time is not None:
+            clauses.append("e.started_at <= ?")
+            params.append(end_time)
+
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        sql = (
+            "SELECT s.*, e.score AS ep_score, e.task_name AS ep_task_name "
+            "FROM steps s "
+            "JOIN episodes e ON s.episode_id = e.episode_id"
+            f"{where} "
+            "ORDER BY s.episode_id, s.step_idx"
+        )
+        rows = self._conn.execute(sql, params).fetchall()
+
+        results: list[dict[str, Any]] = []
+        for row in rows:
+            d = self._deserialize_step(row)
+            # Enrich with episode-level fields
+            d["score"] = d.pop("ep_score", None)
+            d["task_name"] = d.pop("ep_task_name", None)
+            results.append(d)
+
+        return results
+
+    def export_jsonl(
+        self,
+        output_path: Path,
+        *,
+        episode_ids: list[str] | None = None,
+        task_name: str | None = None,
+        min_score: float | None = None,
+        max_score: float | None = None,
+        start_time: float | None = None,
+        end_time: float | None = None,
+    ) -> int:
+        """Export filtered steps to a JSONL file (one JSON object per line).
+
+        Each line contains a single ``(state, action, observation, reward)``
+        tuple enriched with episode-level ``score`` and ``task_name``.
+
+        Args:
+            output_path: Destination JSONL file path.
+            episode_ids: Optional list of episode IDs to include.
+            task_name: Filter to a specific task.
+            min_score: Minimum episode score (inclusive).
+            max_score: Maximum episode score (inclusive).
+            start_time: Minimum episode started_at timestamp.
+            end_time: Maximum episode started_at timestamp.
+
+        Returns:
+            Number of steps exported.
+        """
+        data = self._get_export_data(
+            episode_ids=episode_ids,
+            task_name=task_name,
+            min_score=min_score,
+            max_score=max_score,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as f:
+            for step in data:
+                f.write(json.dumps(step, default=str) + "\n")
+
+        logger.info(
+            "jsonl_exported",
+            output_path=str(output_path),
+            step_count=len(data),
+        )
+        return len(data)
+
+    def export_parquet(
+        self,
+        output_path: Path,
+        *,
+        episode_ids: list[str] | None = None,
+        task_name: str | None = None,
+        min_score: float | None = None,
+        max_score: float | None = None,
+        start_time: float | None = None,
+        end_time: float | None = None,
+    ) -> int:
+        """Export filtered steps to a Parquet file with snappy compression.
+
+        Requires ``pyarrow`` to be installed (available via the ``parquet``
+        optional extra: ``pip install lunar-sandbox[parquet]``).
+
+        The output table has a flat schema with columns: ``episode_id``,
+        ``step_idx``, ``action``, ``observation`` (JSON string), ``reward``,
+        ``score``, ``task_name``, ``duration_ms``, ``timestamp``.
+
+        Args:
+            output_path: Destination Parquet file path.
+            episode_ids: Optional list of episode IDs to include.
+            task_name: Filter to a specific task.
+            min_score: Minimum episode score (inclusive).
+            max_score: Maximum episode score (inclusive).
+            start_time: Minimum episode started_at timestamp.
+            end_time: Maximum episode started_at timestamp.
+
+        Returns:
+            Number of steps exported.
+
+        Raises:
+            ImportError: If ``pyarrow`` is not installed.
+        """
+        try:
+            import pyarrow as pa
+            import pyarrow.parquet as pq
+        except ImportError:
+            raise ImportError(
+                "pyarrow is required for Parquet export. "
+                "Install it with: pip install lunar-sandbox[parquet]"
+            ) from None
+
+        data = self._get_export_data(
+            episode_ids=episode_ids,
+            task_name=task_name,
+            min_score=min_score,
+            max_score=max_score,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+        # Build columnar data for flat table
+        columns: dict[str, list[Any]] = {
+            "episode_id": [],
+            "step_idx": [],
+            "action": [],
+            "observation": [],
+            "reward": [],
+            "score": [],
+            "task_name": [],
+            "duration_ms": [],
+            "timestamp": [],
+        }
+        for step in data:
+            columns["episode_id"].append(step.get("episode_id", ""))
+            columns["step_idx"].append(step.get("step_idx", 0))
+            columns["action"].append(step.get("action", ""))
+            obs = step.get("observation", {})
+            columns["observation"].append(
+                json.dumps(obs, default=str) if isinstance(obs, dict) else str(obs)
+            )
+            columns["reward"].append(step.get("reward", 0.0))
+            columns["score"].append(step.get("score"))
+            columns["task_name"].append(step.get("task_name", ""))
+            columns["duration_ms"].append(step.get("duration_ms", 0.0))
+            columns["timestamp"].append(step.get("timestamp", 0.0))
+
+        schema = pa.schema(
+            [
+                pa.field("episode_id", pa.string()),
+                pa.field("step_idx", pa.int64()),
+                pa.field("action", pa.string()),
+                pa.field("observation", pa.string()),
+                pa.field("reward", pa.float64()),
+                pa.field("score", pa.float64()),
+                pa.field("task_name", pa.string()),
+                pa.field("duration_ms", pa.float64()),
+                pa.field("timestamp", pa.float64()),
+            ]
+        )
+
+        table = pa.Table.from_pydict(columns, schema=schema)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        pq.write_table(table, str(output_path), compression="snappy")
+
+        logger.info(
+            "parquet_exported",
+            output_path=str(output_path),
+            step_count=len(data),
+        )
+        return len(data)
+
     # -- deserialization helpers ----------------------------------------------
 
     def _deserialize_step(self, row: sqlite3.Row) -> dict[str, Any]:
