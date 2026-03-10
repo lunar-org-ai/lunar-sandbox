@@ -1,6 +1,7 @@
 """Task definition, loading, and repo source setup."""
 
 from lunar_sandbox.task.loader import load_task, load_task_from_dict, load_task_from_string
+from lunar_sandbox.task.repo import setup_repo_source
 from lunar_sandbox.task.schema import RepoSource, TaskDefinition
 
 __all__ = [
@@ -9,4 +10,5 @@ __all__ = [
     "load_task",
     "load_task_from_dict",
     "load_task_from_string",
+    "setup_repo_source",
 ]
