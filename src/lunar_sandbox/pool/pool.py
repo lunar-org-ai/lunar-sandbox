@@ -1,9 +1,15 @@
-"""Core sandbox pool manager with acquire/release and FIFO queuing.
+"""Core sandbox pool manager with acquire/release, replenishment, and eviction.
 
 SandboxPool maintains pre-warmed sandbox instances keyed by fingerprint,
 delivering sub-millisecond checkout via dict pop + health check. When the
 idle pool has no match, sandboxes are created on-demand with semaphore
 rate-limiting to prevent thundering herd.
+
+Background tasks:
+  - Replenishment loop periodically fills pools below low-watermark
+  - Eviction sweep removes TTL-expired, idle-timeout, and memory-pressured
+    sandboxes each cycle
+  - Graceful shutdown stops background tasks and destroys all idle sandboxes
 
 Key design invariants:
   - asyncio.Lock protects all pool state mutations (dicts, counters)
@@ -16,6 +22,7 @@ Key design invariants:
 from __future__ import annotations
 
 import asyncio
+import heapq
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Callable
 from uuid import uuid4
@@ -25,6 +32,11 @@ import structlog
 from lunar_sandbox.pool.config import PoolConfig
 from lunar_sandbox.pool.entry import PoolEntry
 from lunar_sandbox.pool.errors import PoolExhaustedError, PoolShuttingDownError
+from lunar_sandbox.pool.evictor import (
+    select_eviction_candidates,
+    select_expired,
+    select_idle_timeout,
+)
 from lunar_sandbox.pool.memory import get_memory_pressure
 from lunar_sandbox.pool.metrics import PoolMetrics
 
@@ -64,6 +76,8 @@ class SandboxPool:
         "_shutdown_event",
         "_sandbox_factory",
         "_replenish_task",
+        "_background_tasks",
+        "_running",
         "_log",
     )
 
@@ -86,6 +100,8 @@ class SandboxPool:
         self._shutdown_event = asyncio.Event()
         self._sandbox_factory = sandbox_factory
         self._replenish_task: asyncio.Task[None] | None = None
+        self._background_tasks: set[asyncio.Task[None]] = set()
+        self._running = False
         self._log = structlog.get_logger(__name__).bind(component="pool")
 
     # ------------------------------------------------------------------
@@ -237,9 +253,15 @@ class SandboxPool:
     async def start(self) -> None:
         """Start the pool manager.
 
-        Placeholder for Plan 04 which adds background replenishment
-        and eviction sweep tasks.
+        Launches the background replenishment loop which periodically
+        runs eviction sweeps and replenishes pools below their
+        low-watermark threshold.
         """
+        self._running = True
+        self._shutdown_event.clear()
+        self._replenish_task = asyncio.create_task(
+            self._replenishment_loop(), name="pool-replenish"
+        )
         self._log.info("pool_started")
 
     @property
@@ -447,3 +469,193 @@ class SandboxPool:
     def _at_global_cap(self) -> bool:
         """Check if total sandboxes (idle + active + pending) >= cap."""
         return self._metrics.pool_size >= self._config.global_max_sandboxes
+
+    # ------------------------------------------------------------------
+    # Internal: background replenishment loop
+    # ------------------------------------------------------------------
+
+    async def _replenishment_loop(self) -> None:
+        """Background daemon: eviction sweep then replenish on each cycle.
+
+        Uses ``shutdown_event.wait()`` with a timeout as the sleep
+        mechanism. When the event is set, the loop exits cleanly.
+        Runs eviction sweep first (free resources), then replenish
+        (use freed capacity).
+        """
+        self._log.debug("replenishment_loop_started")
+        while not self._shutdown_event.is_set():
+            try:
+                # Wait for shutdown or timeout (acts as sleep)
+                try:
+                    await asyncio.wait_for(
+                        self._shutdown_event.wait(),
+                        timeout=self._config.replenish_interval_seconds,
+                    )
+                    # Event was set -- exit loop
+                    break
+                except asyncio.TimeoutError:
+                    pass  # Normal timeout -- run maintenance cycle
+
+                await self._eviction_sweep()
+                await self._replenish_cycle()
+
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                self._log.exception("replenishment_loop_error")
+
+        self._log.debug("replenishment_loop_stopped")
+
+    async def _eviction_sweep(self) -> None:
+        """Run eviction sweep: TTL expired, idle timeout, then memory pressure.
+
+        Acquires the lock to select candidates (mutates idle_pools),
+        then releases the lock before destroying sandboxes in parallel.
+        """
+        to_destroy: list[PoolEntry] = []
+
+        async with self._lock:
+            # 1. Always remove TTL-expired
+            expired = select_expired(
+                self._idle_pools, self._config.ttl_seconds
+            )
+            if expired:
+                self._metrics.total_ttl_expiries += len(expired)
+                self._metrics.pool_size -= len(expired)
+                to_destroy.extend(expired)
+
+            # 2. Always remove idle-timeout
+            idle_timeout = select_idle_timeout(
+                self._idle_pools, self._config.idle_timeout_seconds
+            )
+            if idle_timeout:
+                self._metrics.total_idle_timeouts += len(idle_timeout)
+                self._metrics.pool_size -= len(idle_timeout)
+                to_destroy.extend(idle_timeout)
+
+            # 3. Memory pressure eviction (LRU-diversity)
+            pressure = get_memory_pressure()
+            if pressure >= self._config.memory_pressure_threshold:
+                # Evict up to batch_size entries under pressure
+                candidates = select_eviction_candidates(
+                    self._idle_pools,
+                    count=self._config.replenish_batch_size,
+                    keep_minimum=1,
+                )
+                if candidates:
+                    self._metrics.total_evictions += len(candidates)
+                    self._metrics.pool_size -= len(candidates)
+                    to_destroy.extend(candidates)
+
+            # Adjust targets: if all idle for a fingerprint were evicted,
+            # decrement that fingerprint's target
+            for fp in list(self._targets.keys()):
+                fp_pool = self._idle_pools.get(fp)
+                if not fp_pool or len(fp_pool) == 0:
+                    # Only decrement if we actually evicted from this fp
+                    if any(e.fingerprint == fp for e in to_destroy):
+                        self._targets[fp] = max(
+                            1, self._targets.get(fp, 1) - 1
+                        )
+
+            self._metrics.idle_count = self._total_idle()
+
+        # Destroy outside lock -- parallel via gather
+        if to_destroy:
+            await asyncio.gather(
+                *(self._destroy_entry(e) for e in to_destroy),
+                return_exceptions=True,
+            )
+            self._log.info(
+                "eviction_sweep_complete",
+                destroyed=len(to_destroy),
+                expired=len(expired),
+                idle_timeout=len(idle_timeout),
+                pressure_evicted=len(to_destroy) - len(expired) - len(idle_timeout),
+            )
+
+    async def _replenish_cycle(self) -> None:
+        """Replenish pools below their low-watermark threshold.
+
+        Builds a priority list of fingerprints sorted by depletion
+        (most depleted first via min-heap). Creates sandboxes up to
+        batch_size, rate-limited by the creation semaphore.
+        """
+        async with self._lock:
+            if not self._targets:
+                return
+
+            # Build priority queue: (deficit_ratio, fingerprint)
+            # Most depleted (smallest ratio) gets highest priority
+            heap: list[tuple[float, str]] = []
+            for fp, target in self._targets.items():
+                if target <= 0:
+                    continue
+                current_idle = len(self._idle_pools.get(fp, {}))
+                watermark = max(1, int(target * self._config.low_watermark_ratio))
+                if current_idle < watermark:
+                    ratio = current_idle / target if target > 0 else 0.0
+                    heapq.heappush(heap, (ratio, fp))
+
+            if not heap:
+                return
+
+            # Calculate room under global cap
+            cap_room = (
+                self._config.global_max_sandboxes - self._metrics.pool_size
+            )
+            if cap_room <= 0:
+                return
+
+            # Plan creations: up to batch_size, respecting cap
+            plan: list[str] = []
+            batch_remaining = min(
+                self._config.replenish_batch_size, cap_room
+            )
+            while heap and batch_remaining > 0:
+                _ratio, fp = heapq.heappop(heap)
+                target = self._targets.get(fp, 0)
+                current_idle = len(self._idle_pools.get(fp, {}))
+                needed = target - current_idle
+                to_create = min(needed, batch_remaining)
+                for _ in range(to_create):
+                    plan.append(fp)
+                batch_remaining -= to_create
+
+        # Create outside lock, rate-limited by semaphore
+        if not plan:
+            return
+
+        created: list[tuple[str, PoolEntry]] = []
+        for fp in plan:
+            if self._shutdown_event.is_set():
+                break
+            try:
+                sandbox = await self._create_sandbox(fp)
+                entry = PoolEntry(
+                    sandbox=sandbox,
+                    sandbox_id=sandbox.config.sandbox_id,
+                    fingerprint=fp,
+                )
+                created.append((fp, entry))
+            except Exception:
+                self._log.exception(
+                    "replenish_creation_failed", fingerprint=fp
+                )
+
+        # Re-acquire lock to add to idle pools
+        if created:
+            async with self._condition:
+                for fp, entry in created:
+                    fp_pool = self._idle_pools.setdefault(
+                        fp, OrderedDict()
+                    )
+                    fp_pool[entry.sandbox_id] = entry
+                self._metrics.idle_count = self._total_idle()
+                self._condition.notify_all()
+
+            self._log.info(
+                "replenish_cycle_complete",
+                created=len(created),
+                planned=len(plan),
+            )
