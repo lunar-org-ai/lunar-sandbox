@@ -159,6 +159,13 @@ class SandboxPool:
                 self._targets[fingerprint] = min(
                     self._config.per_fingerprint_soft_limit, 2
                 )
+            else:
+                # Reactive target growth: demand signal grows target by 1
+                current_target = self._targets.get(fingerprint, 1)
+                self._targets[fingerprint] = min(
+                    current_target + 1,
+                    self._config.per_fingerprint_soft_limit,
+                )
 
             # Global cap enforcement with FIFO wait
             while self._at_global_cap() and not self._has_idle(fingerprint):
@@ -241,8 +248,10 @@ class SandboxPool:
                 return
             self._metrics.active_count = len(self._active)
 
-        # Fire-and-forget background reset
-        asyncio.create_task(self._background_reset(entry))
+        # Fire-and-forget background reset (tracked for shutdown)
+        self._track_task(
+            asyncio.create_task(self._background_reset(entry))
+        )
 
         self._log.debug(
             "pool_released",
@@ -263,6 +272,78 @@ class SandboxPool:
             self._replenishment_loop(), name="pool-replenish"
         )
         self._log.info("pool_started")
+
+    async def shutdown(self) -> None:
+        """Gracefully shut down the pool.
+
+        Sequence:
+          1. Set shutdown event (stops new acquire calls)
+          2. Cancel replenishment loop task
+          3. Wait for in-flight background tasks (reset, destroy)
+          4. Destroy all remaining idle sandboxes
+          5. Log final metrics
+        """
+        if not self._running:
+            return
+
+        self._log.info("pool_shutdown_initiated")
+        self._shutdown_event.set()
+
+        # Wake any waiters so they see shutdown
+        async with self._condition:
+            self._condition.notify_all()
+
+        # Cancel replenishment loop
+        if self._replenish_task is not None:
+            self._replenish_task.cancel()
+            try:
+                await self._replenish_task
+            except asyncio.CancelledError:
+                pass
+            self._replenish_task = None
+
+        # Wait for in-flight background tasks
+        if self._background_tasks:
+            await asyncio.gather(
+                *self._background_tasks, return_exceptions=True
+            )
+
+        # Destroy all remaining idle sandboxes
+        to_destroy: list[PoolEntry] = []
+        async with self._lock:
+            for fp, entries in self._idle_pools.items():
+                to_destroy.extend(entries.values())
+            self._idle_pools.clear()
+            self._metrics.pool_size -= len(to_destroy)
+            self._metrics.idle_count = 0
+
+        if to_destroy:
+            await asyncio.gather(
+                *(self._destroy_entry(e) for e in to_destroy),
+                return_exceptions=True,
+            )
+
+        self._running = False
+        self._log.info(
+            "pool_shutdown_complete",
+            destroyed_idle=len(to_destroy),
+            final_metrics=self._metrics.snapshot(),
+        )
+
+    async def status(self) -> dict:
+        """Return current pool status as a serializable dictionary.
+
+        Returns:
+            Dict with running state, metrics snapshot, known fingerprints,
+            and per-fingerprint targets.
+        """
+        async with self._lock:
+            return {
+                "running": self._running,
+                "metrics": self._metrics.snapshot(),
+                "fingerprints": sorted(self._known_fingerprints),
+                "targets": dict(self._targets),
+            }
 
     @property
     def metrics(self) -> PoolMetrics:
@@ -452,6 +533,19 @@ class SandboxPool:
                 "pool_destroy_failed",
                 sandbox_id=entry.sandbox_id,
             )
+
+    # ------------------------------------------------------------------
+    # Internal: task tracking
+    # ------------------------------------------------------------------
+
+    def _track_task(self, task: asyncio.Task[None]) -> None:
+        """Track a background task for graceful shutdown.
+
+        Adds the task to ``_background_tasks`` and registers a
+        done-callback that removes it upon completion.
+        """
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
     # ------------------------------------------------------------------
     # Internal: capacity helpers
