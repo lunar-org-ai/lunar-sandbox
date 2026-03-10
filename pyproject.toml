@@ -8,7 +8,9 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "pydantic>=2.12",
     "pyseccomp>=0.1",
+    "pyyaml>=6.0",
     "structlog>=24.0",
 ]
 
