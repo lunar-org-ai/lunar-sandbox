@@ -12,6 +12,7 @@ from lunar_sandbox.pool.errors import (
     PoolExhaustedError,
     PoolShuttingDownError,
 )
+from lunar_sandbox.pool.fingerprint import pool_fingerprint
 from lunar_sandbox.pool.metrics import PoolMetrics
 
 __all__ = [
@@ -21,4 +22,5 @@ __all__ = [
     "PoolExhaustedError",
     "PoolMetrics",
     "PoolShuttingDownError",
+    "pool_fingerprint",
 ]
