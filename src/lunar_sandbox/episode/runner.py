@@ -14,6 +14,7 @@ Agent errors are caught and recorded as ``AGENT_ERROR``.
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Any, Protocol
 from uuid import uuid4
 
@@ -25,6 +26,12 @@ from lunar_sandbox.episode.result import EpisodeResult
 from lunar_sandbox.episode.scoring import run_scoring
 from lunar_sandbox.episode.state import EpisodeOutcome, EpisodePhase, EpisodeState
 from lunar_sandbox.sandbox.errors import InfraError
+from lunar_sandbox.trajectory import (
+    StepStateTracker,
+    TrajectoryStep,
+    TrajectoryStore,
+    TrajectoryWriter,
+)
 
 __all__ = ["EpisodeRunner"]
 
@@ -55,6 +62,12 @@ class EpisodeRunner:
     Coordinates sandbox allocation, task injection (repo clone + setup),
     agent action loop, scoring, and sandbox reset.
 
+    When ``trajectory_dir`` is provided, every action automatically streams
+    a :class:`~lunar_sandbox.trajectory.TrajectoryStep` to a JSONL file.
+    After the episode completes, the JSONL is ingested into SQLite via
+    :class:`~lunar_sandbox.trajectory.TrajectoryStore` and the final step
+    reward is backfilled with the episode score.
+
     Args:
         sandbox: A sandbox instance (must be in RUNNING state).
         task: A :class:`~lunar_sandbox.task.schema.TaskDefinition`.
@@ -62,6 +75,8 @@ class EpisodeRunner:
         agent_adapter: Optional agent adapter that drives the action loop.
             When None, the caller drives actions manually via
             :meth:`execute_action`.
+        trajectory_dir: Optional directory for JSONL trajectory files.
+            When None, no trajectory objects are created (zero overhead).
     """
 
     def __init__(
@@ -70,6 +85,7 @@ class EpisodeRunner:
         task: Any,
         episode_id: str | None = None,
         agent_adapter: AgentAdapter | None = None,
+        trajectory_dir: Path | None = None,
     ) -> None:
         self._sandbox = sandbox
         self._task = task
@@ -80,6 +96,9 @@ class EpisodeRunner:
         self._trace_events: list[TraceEvent] = []
         self._seq: int = 0
         self._deadline: float | None = None
+        self._trajectory_dir = trajectory_dir
+        self._writer: TrajectoryWriter | None = None
+        self._state_tracker: StepStateTracker | None = None
         self._log = log.bind(episode_id=self._episode_id)
 
     # ------------------------------------------------------------------
@@ -110,9 +129,21 @@ class EpisodeRunner:
 
         Orchestrates: allocate -> inject -> run -> score -> reset -> finish.
 
+        When ``trajectory_dir`` was provided, the writer is opened before
+        the first phase and closed in the ``finally`` block, ensuring
+        crash-safe JSONL even on unexpected errors.  After the writer is
+        closed the JSONL is ingested into SQLite and the final step reward
+        is backfilled with the episode score.
+
         Returns:
             An :class:`EpisodeResult` with outcome, score, and trace.
         """
+        # Open trajectory writer if configured
+        if self._trajectory_dir is not None:
+            self._writer = TrajectoryWriter(self._trajectory_dir, self._episode_id)
+            self._state_tracker = StepStateTracker()
+            self._writer.open()
+
         try:
             # ---- 1. ALLOCATING ----
             await self._phase_allocate()
@@ -161,6 +192,11 @@ class EpisodeRunner:
                     pass
                 self._client = None
 
+            # Close trajectory writer and ingest into SQLite
+            if self._writer is not None:
+                self._writer.close()
+                self._ingest_trajectory()
+
         task_name = getattr(self._task, "name", "")
         sandbox_id = getattr(
             getattr(self._sandbox, "config", None), "sandbox_id", ""
@@ -180,6 +216,7 @@ class EpisodeRunner:
             task_name=task_name,
             sandbox_id=sandbox_id,
             trace_events=[te.model_dump() for te in self._trace_events],
+            jsonl_path=str(self._writer.path) if self._writer else "",
         )
 
     # ------------------------------------------------------------------
@@ -514,6 +551,10 @@ class EpisodeRunner:
     ) -> None:
         """Create and store a trace event from an action response.
 
+        Also writes a :class:`TrajectoryStep` to the JSONL writer when
+        trajectory streaming is active.  File diffs are captured from
+        ``response.side_effects.model_dump()`` (API actions only).
+
         Args:
             action: Action type string.
             params: Action parameters.
@@ -556,6 +597,30 @@ class EpisodeRunner:
 
         self._trace_events.append(event)
 
+        # Write trajectory step if writer is active
+        if self._writer is not None and self._state_tracker is not None:
+            file_diff = (
+                response.side_effects.model_dump()
+                if response.side_effects
+                else None
+            )
+            step = TrajectoryStep(
+                episode_id=self._episode_id,
+                step_idx=self._state.step_count,
+                timestamp=event.ts,
+                state=self._state_tracker.get_state(cwd=response.cwd),
+                action=action,
+                action_params=params,
+                observation=output,
+                duration_ms=event.duration_ms,
+                cpu_time_ms=event.cpu_time_ms,
+                file_diff=file_diff,
+                source=source,
+                sandbox_id=event.sandbox_id,
+            )
+            self._writer.write_step(step)
+            self._state_tracker.record_action(action)
+
     def _wrap_shell_trace(
         self,
         command: str,
@@ -567,6 +632,10 @@ class EpisodeRunner:
         Maps result dict fields (stdout, stderr, exit_code, cwd) into
         the TraceEvent schema with ``source="shell"`` and
         ``action="execute_command"``.
+
+        Also writes a :class:`TrajectoryStep` when trajectory streaming
+        is active.  Shell actions always get ``file_diff=None`` because
+        ``sandbox.execute()`` returns a raw dict without side_effects.
 
         Args:
             command: The shell command that was executed.
@@ -598,7 +667,7 @@ class EpisodeRunner:
         if "cwd" in result:
             output["cwd"] = result["cwd"]
 
-        return TraceEvent(
+        event = TraceEvent(
             seq=self._seq,
             ts=time.time(),
             action="execute_command",
@@ -613,9 +682,106 @@ class EpisodeRunner:
             ),
         )
 
+        # Write trajectory step if writer is active
+        # Shell actions get file_diff=None (sandbox.execute() has no side_effects)
+        if self._writer is not None and self._state_tracker is not None:
+            step = TrajectoryStep(
+                episode_id=self._episode_id,
+                step_idx=self._state.step_count,
+                timestamp=event.ts,
+                state=self._state_tracker.get_state(
+                    cwd=result.get("cwd", ""),
+                ),
+                action="execute_command",
+                action_params={"command": command},
+                observation=output,
+                duration_ms=duration_ms,
+                file_diff=None,
+                source="shell",
+                sandbox_id=event.sandbox_id,
+            )
+            self._writer.write_step(step)
+            self._state_tracker.record_action("execute_command")
+
+        return event
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _ingest_trajectory(self) -> None:
+        """Ingest the JSONL trajectory into SQLite and backfill final reward.
+
+        Called after the writer is closed in the ``finally`` block.
+        Errors are logged but never propagated -- ingestion failure must
+        not mask the episode result.
+        """
+        if self._writer is None or self._trajectory_dir is None:
+            return
+
+        try:
+            db_path = self._trajectory_dir / "trajectories.db"
+            task_name = getattr(self._task, "name", "")
+            outcome = (
+                self._state.outcome.value
+                if self._state.outcome is not None
+                else "unknown"
+            )
+            is_complete = int(
+                self._state.outcome
+                in (EpisodeOutcome.COMPLETED, EpisodeOutcome.TIMEOUT)
+                if self._state.outcome is not None
+                else False
+            )
+
+            episode_metadata: dict[str, Any] = {
+                "episode_id": self._episode_id,
+                "task_name": task_name,
+                "outcome": outcome,
+                "score": self._state.score,
+                "step_count": self._state.step_count,
+                "duration_ms": self._state.elapsed_ms(),
+                "started_at": self._state.started_at,
+                "ended_at": (
+                    self._state.ended_at
+                    if self._state.ended_at is not None
+                    else 0.0
+                ),
+                "is_complete": is_complete,
+                "sandbox_id": getattr(
+                    getattr(self._sandbox, "config", None), "sandbox_id", ""
+                ),
+            }
+
+            store = TrajectoryStore(db_path)
+            store.open()
+            try:
+                store.ingest_from_jsonl(self._writer.path, episode_metadata)
+
+                # Backfill final step reward with episode score
+                if self._state.score is not None and store._conn is not None:
+                    store._conn.execute(
+                        "UPDATE steps SET reward = ? "
+                        "WHERE episode_id = ? "
+                        "AND step_idx = (SELECT MAX(step_idx) FROM steps WHERE episode_id = ?)",
+                        (self._state.score, self._episode_id, self._episode_id),
+                    )
+                    store._conn.commit()
+
+                self._log.info(
+                    "trajectory_ingested",
+                    db_path=str(db_path),
+                    episode_id=self._episode_id,
+                )
+            finally:
+                store.close()
+
+        except Exception as exc:
+            self._log.warning(
+                "trajectory_ingestion_failed",
+                error=str(exc),
+                episode_id=self._episode_id,
+            )
 
     def _resolve_socket_path(self) -> str | None:
         """Determine the executor socket path from the sandbox.
