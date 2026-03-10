@@ -1,0 +1,23 @@
+[project]
+name = "lunar-sandbox"
+version = "0.1.0"
+description = "Linux namespace sandboxes with OverlayFS, cgroups v2, and seccomp-bpf for AI agent evaluation"
+readme = "README.md"
+authors = [
+    { name = "Diogo vieira", email = "diogobgff@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "pyseccomp>=0.1",
+    "structlog>=24.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov",
+]
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"
