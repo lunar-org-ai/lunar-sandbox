@@ -70,7 +70,8 @@ class TestSelectExpired:
             "fp2": OrderedDict([("s2", e2), ("s3", e3)]),
         }
         result = select_expired(pools, ttl_seconds=5.0)
-        assert set(result) == {e1, e3}
+        result_ids = sorted(e.sandbox_id for e in result)
+        assert result_ids == ["s1", "s3"]
 
     def test_empty_pools(self) -> None:
         pools: dict[str, OrderedDict[str, PoolEntry]] = {}
@@ -84,7 +85,8 @@ class TestSelectExpired:
             "fp1": OrderedDict([("s1", e1), ("s2", e2)]),
         }
         result = select_expired(pools, ttl_seconds=5.0)
-        assert set(result) == {e1, e2}
+        result_ids = sorted(e.sandbox_id for e in result)
+        assert result_ids == ["s1", "s2"]
 
     def test_removes_expired_from_pool(self) -> None:
         expired = _make_entry(sandbox_id="s1", created_offset=10.0)
