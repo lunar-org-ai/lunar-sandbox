@@ -277,3 +277,197 @@ class TrajectoryStore:
                         episode_id=episode_metadata.get("episode_id"),
                     )
         return self.ingest_episode(episode_metadata, steps)
+
+    # -- queries -------------------------------------------------------------
+
+    def _row_to_dict(self, row: sqlite3.Row) -> dict[str, Any]:
+        """Convert a sqlite3.Row to a plain dict."""
+        return dict(row)
+
+    def query_episodes(
+        self,
+        *,
+        task_name: str | None = None,
+        episode_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Query episodes by task name and/or episode ID.
+
+        Args:
+            task_name: Filter to episodes for this task.
+            episode_id: Filter to a specific episode.
+
+        Returns:
+            List of episode dicts matching filters.
+        """
+        assert self._conn is not None  # noqa: S101
+        clauses: list[str] = []
+        params: list[Any] = []
+        if task_name is not None:
+            clauses.append("task_name = ?")
+            params.append(task_name)
+        if episode_id is not None:
+            clauses.append("episode_id = ?")
+            params.append(episode_id)
+        where = " AND ".join(clauses)
+        sql = "SELECT * FROM episodes"
+        if where:
+            sql += f" WHERE {where}"
+        sql += " ORDER BY started_at DESC"
+        return [self._row_to_dict(r) for r in self._conn.execute(sql, params).fetchall()]
+
+    def query_episodes_by_score(
+        self,
+        *,
+        min_score: float | None = None,
+        max_score: float | None = None,
+        task_name: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Query episodes filtered by score range.
+
+        Args:
+            min_score: Minimum score (inclusive).
+            max_score: Maximum score (inclusive).
+            task_name: Optionally restrict to a specific task.
+
+        Returns:
+            List of episode dicts within the score range.
+        """
+        assert self._conn is not None  # noqa: S101
+        clauses: list[str] = []
+        params: list[Any] = []
+        if min_score is not None:
+            clauses.append("score >= ?")
+            params.append(min_score)
+        if max_score is not None:
+            clauses.append("score <= ?")
+            params.append(max_score)
+        if task_name is not None:
+            clauses.append("task_name = ?")
+            params.append(task_name)
+        where = " AND ".join(clauses)
+        sql = "SELECT * FROM episodes"
+        if where:
+            sql += f" WHERE {where}"
+        sql += " ORDER BY score DESC"
+        return [self._row_to_dict(r) for r in self._conn.execute(sql, params).fetchall()]
+
+    def query_steps_by_action(
+        self,
+        action: str,
+        *,
+        episode_ids: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Query steps by action type, optionally scoped to specific episodes.
+
+        JSON columns (action_params, observation, file_diff, state_json)
+        are deserialized back to dicts.
+
+        Args:
+            action: Action type string to match.
+            episode_ids: Optional list of episode IDs to scope the search.
+
+        Returns:
+            List of step dicts matching the action type.
+        """
+        assert self._conn is not None  # noqa: S101
+        clauses: list[str] = ["action = ?"]
+        params: list[Any] = [action]
+        if episode_ids:
+            placeholders = ", ".join("?" for _ in episode_ids)
+            clauses.append(f"episode_id IN ({placeholders})")
+            params.extend(episode_ids)
+        where = " AND ".join(clauses)
+        sql = f"SELECT * FROM steps WHERE {where} ORDER BY episode_id, step_idx"
+        rows = self._conn.execute(sql, params).fetchall()
+        return [self._deserialize_step(r) for r in rows]
+
+    def query_episodes_by_time(
+        self,
+        *,
+        start_time: float | None = None,
+        end_time: float | None = None,
+    ) -> list[dict[str, Any]]:
+        """Query episodes within a time window based on started_at.
+
+        Args:
+            start_time: Minimum started_at timestamp (inclusive).
+            end_time: Maximum started_at timestamp (inclusive).
+
+        Returns:
+            List of episode dicts within the time window.
+        """
+        assert self._conn is not None  # noqa: S101
+        clauses: list[str] = []
+        params: list[Any] = []
+        if start_time is not None:
+            clauses.append("started_at >= ?")
+            params.append(start_time)
+        if end_time is not None:
+            clauses.append("started_at <= ?")
+            params.append(end_time)
+        where = " AND ".join(clauses)
+        sql = "SELECT * FROM episodes"
+        if where:
+            sql += f" WHERE {where}"
+        sql += " ORDER BY started_at DESC"
+        return [self._row_to_dict(r) for r in self._conn.execute(sql, params).fetchall()]
+
+    def query_steps(self, episode_ids: list[str]) -> list[dict[str, Any]]:
+        """Fetch steps for a set of episodes, ordered by episode and step index.
+
+        JSON columns (action_params, observation, file_diff, state_json)
+        are deserialized back to dicts.
+
+        Args:
+            episode_ids: Episode IDs to fetch steps for.
+
+        Returns:
+            List of step dicts with JSON fields deserialized.
+        """
+        assert self._conn is not None  # noqa: S101
+        if not episode_ids:
+            return []
+        placeholders = ", ".join("?" for _ in episode_ids)
+        sql = (
+            f"SELECT * FROM steps WHERE episode_id IN ({placeholders}) "
+            "ORDER BY episode_id, step_idx"
+        )
+        rows = self._conn.execute(sql, episode_ids).fetchall()
+        return [self._deserialize_step(r) for r in rows]
+
+    def count_episodes(self, *, task_name: str | None = None) -> int:
+        """Count episodes, optionally filtered by task name.
+
+        Args:
+            task_name: If provided, count only episodes for this task.
+
+        Returns:
+            Number of matching episodes.
+        """
+        assert self._conn is not None  # noqa: S101
+        if task_name is not None:
+            row = self._conn.execute(
+                "SELECT COUNT(*) FROM episodes WHERE task_name = ?",
+                (task_name,),
+            ).fetchone()
+        else:
+            row = self._conn.execute("SELECT COUNT(*) FROM episodes").fetchone()
+        return row[0]
+
+    # -- deserialization helpers ----------------------------------------------
+
+    def _deserialize_step(self, row: sqlite3.Row) -> dict[str, Any]:
+        """Convert a step row to a dict with JSON columns deserialized."""
+        d = dict(row)
+        for col in ("action_params", "observation", "state_json"):
+            if d.get(col) is not None:
+                try:
+                    d[col] = json.loads(d[col])
+                except (json.JSONDecodeError, TypeError):
+                    pass
+        if d.get("file_diff") is not None:
+            try:
+                d["file_diff"] = json.loads(d["file_diff"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return d
