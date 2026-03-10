@@ -75,3 +75,24 @@ class ResourceLimitError(SandboxError):
     """Cgroup resource limit exceeded (OOM, CPU quota, pids max, etc.)."""
 
     pass
+
+
+class ProtocolError(SandboxError):
+    """JSON-RPC protocol-level error (malformed message, parse failure).
+
+    This is an infrastructure error, not an agent error. It indicates
+    a problem with the communication framing between host and sandbox.
+
+    Attributes:
+        raw_data: The unparseable bytes that caused the error,
+            stored for debugging and logging.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        raw_data: bytes = b"",
+    ) -> None:
+        super().__init__(message)
+        self.raw_data = raw_data
