@@ -1,5 +1,11 @@
 """Action types, protocol, and execution models for the sandbox API."""
 
+from lunar_sandbox.actions.diff import (
+    diff_snapshots,
+    inspect_upper_layer,
+    snapshot_upper_state,
+)
+from lunar_sandbox.actions.handlers import ActionHandlers, handle_action
 from lunar_sandbox.actions.types import (
     ACTION_TIMEOUTS,
     ActionRequest,
@@ -18,4 +24,9 @@ __all__ = [
     "FileDiff",
     "TraceEvent",
     "ACTION_TIMEOUTS",
+    "ActionHandlers",
+    "handle_action",
+    "inspect_upper_layer",
+    "snapshot_upper_state",
+    "diff_snapshots",
 ]
