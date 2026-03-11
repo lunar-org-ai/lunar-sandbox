@@ -236,41 +236,39 @@ function TelemetrySection() {
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-50">
-      <div className="max-w-4xl mx-auto p-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-8">Lunar Sandbox Dashboard</h1>
+    <div className="max-w-4xl mx-auto p-8">
+      <h1 className="text-3xl font-bold tracking-tight mb-8">Lunar Sandbox Dashboard</h1>
 
-        <div className="grid grid-cols-1 gap-6">
-          {/* Health */}
-          <section className="bg-neutral-900 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">API Health</h2>
-            <HealthSection />
-          </section>
+      <div className="grid grid-cols-1 gap-6">
+        {/* Health */}
+        <section className="bg-neutral-900 rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">API Health</h2>
+          <HealthSection />
+        </section>
 
-          {/* Sandboxes */}
-          <section className="bg-neutral-900 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Sandbox Pool</h2>
-            <SandboxesSection />
-          </section>
+        {/* Sandboxes */}
+        <section className="bg-neutral-900 rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">Sandbox Pool</h2>
+          <SandboxesSection />
+        </section>
 
-          {/* Episodes */}
-          <section className="bg-neutral-900 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Recent Episodes</h2>
-            <EpisodesSection />
-          </section>
+        {/* Episodes */}
+        <section className="bg-neutral-900 rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">Recent Episodes</h2>
+          <EpisodesSection />
+        </section>
 
-          {/* Tasks */}
-          <section className="bg-neutral-900 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Tasks</h2>
-            <TasksSection />
-          </section>
+        {/* Tasks */}
+        <section className="bg-neutral-900 rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">Tasks</h2>
+          <TasksSection />
+        </section>
 
-          {/* Telemetry */}
-          <section className="bg-neutral-900 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Telemetry Runs</h2>
-            <TelemetrySection />
-          </section>
-        </div>
+        {/* Telemetry */}
+        <section className="bg-neutral-900 rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">Telemetry Runs</h2>
+          <TelemetrySection />
+        </section>
       </div>
     </div>
   )
