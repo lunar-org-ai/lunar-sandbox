@@ -78,3 +78,12 @@ try:
     app.add_typer(pool_cmd.app, name="pool", help="Manage sandbox pool daemon")
 except (ImportError, AttributeError):
     pass
+
+try:
+    from lunar_sandbox.cli import telemetry_cmd  # noqa: F401
+
+    app.add_typer(
+        telemetry_cmd.app, name="telemetry", help="View and manage performance telemetry"
+    )
+except (ImportError, AttributeError):
+    pass
