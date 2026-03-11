@@ -13,6 +13,10 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lunar_sandbox.telemetry.types import ThresholdConfig
 
 __all__ = ["EngineConfig"]
 
@@ -40,6 +44,8 @@ class EngineConfig:
         data_root: Root directory for sandbox runtime data (OverlayFS
             layers, cgroups, etc.).
         fail_fast: Stop the entire batch on the first task failure.
+        thresholds: Optional :class:`ThresholdConfig` for performance
+            threshold checking during and after evaluation.
     """
 
     max_workers: int = 0
@@ -51,6 +57,7 @@ class EngineConfig:
     max_retries: int = 1
     data_root: str = "/var/lib/lunar-sandbox"
     fail_fast: bool = False
+    thresholds: ThresholdConfig | None = None
 
     def effective_workers(self) -> int:
         """Return the effective worker count, auto-detecting if zero."""

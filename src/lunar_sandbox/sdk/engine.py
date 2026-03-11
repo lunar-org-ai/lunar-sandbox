@@ -62,6 +62,7 @@ class LunarEngine:
         "_scheduler",
         "_traj_store",
         "_batch_store",
+        "_telemetry",
         "_started",
     )
 
@@ -71,6 +72,7 @@ class LunarEngine:
         self._scheduler: BatchScheduler | None = None
         self._traj_store: TrajectoryStore | None = None
         self._batch_store: BatchResultStore | None = None
+        self._telemetry: Any = None
         self._started = False
 
     # ------------------------------------------------------------------
@@ -93,14 +95,17 @@ class LunarEngine:
         from lunar_sandbox.pool.pool import SandboxPool
         from lunar_sandbox.scheduler.scheduler import BatchScheduler
         from lunar_sandbox.scheduler.store import BatchResultStore
+        from lunar_sandbox.telemetry.collector import TelemetryCollector
         from lunar_sandbox.trajectory.store import TrajectoryStore
 
+        self._telemetry = TelemetryCollector()
+
         pool_config = self._make_pool_config()
-        self._pool = SandboxPool(pool_config)
+        self._pool = SandboxPool(pool_config, telemetry_collector=self._telemetry)
         await self._pool.start()
 
         batch_config = self._make_batch_config()
-        self._scheduler = BatchScheduler(self._pool, batch_config)
+        self._scheduler = BatchScheduler(self._pool, batch_config, telemetry_collector=self._telemetry)
 
         self._traj_store = TrajectoryStore(
             self._config.trajectory_dir / "trajectories.db"
@@ -296,6 +301,133 @@ class LunarEngine:
     def pool(self) -> SandboxPool | None:
         """The underlying :class:`SandboxPool`, or ``None`` if not started."""
         return self._pool
+
+    @property
+    def telemetry_collector(self) -> Any:
+        """The underlying :class:`TelemetryCollector`, or ``None`` if not started."""
+        return self._telemetry
+
+    async def telemetry_snapshot(self) -> dict[str, Any]:
+        """Compute and return current telemetry snapshot as a dict.
+
+        Returns a dict with metrics, throughput, cache_hit_rate, and any
+        threshold breaches.  Returns empty dict if engine not started.
+
+        NOTE: This reads from the collector via snapshot() (non-destructive).
+        Do NOT call this AFTER flush_telemetry() -- flush drains the collector.
+        For post-run snapshots, use the return value of flush_telemetry() instead.
+        """
+        await self._auto_start()
+        if self._telemetry is None:
+            return {}
+
+        from lunar_sandbox.telemetry.compute import compute_snapshot
+
+        samples = self._telemetry.snapshot()
+        if not samples:
+            return {"metrics": {}, "throughput_eps_per_min": 0.0, "cache_hit_rate": 0.0, "breaches": []}
+
+        # Estimate duration from sample timestamps
+        timestamps = [s.timestamp for s in samples]
+        duration = max(timestamps) - min(timestamps) if len(timestamps) > 1 else 0.0
+
+        snapshot = compute_snapshot(samples, "current", duration)
+        return self._snapshot_to_dict(snapshot)
+
+    def _snapshot_to_dict(self, snapshot: Any) -> dict[str, Any]:
+        """Convert a TelemetrySnapshot to a dict with optional threshold breaches."""
+        from lunar_sandbox.telemetry.compute import check_thresholds
+
+        result: dict[str, Any] = {
+            "run_id": snapshot.run_id,
+            "metrics": {},
+            "throughput_eps_per_min": snapshot.throughput_eps_per_min,
+            "cache_hit_rate": snapshot.cache_hit_rate,
+            "total_episodes": snapshot.total_episodes,
+        }
+        for name, stats in snapshot.metrics.items():
+            result["metrics"][name] = {
+                "p50": stats.p50,
+                "p95": stats.p95,
+                "mean": stats.mean,
+                "count": stats.count,
+                "min": stats.min_val,
+                "max": stats.max_val,
+            }
+
+        # Check thresholds if configured
+        thresholds = self._config.thresholds
+        if thresholds is not None:
+            breaches = check_thresholds(snapshot, thresholds)
+            result["breaches"] = [
+                {"metric": b.metric, "threshold": b.threshold, "actual": b.actual, "severity": b.severity}
+                for b in breaches
+            ]
+        else:
+            result["breaches"] = []
+
+        return result
+
+    async def flush_telemetry(
+        self,
+        run_id: str,
+        started_at: float,
+        ended_at: float,
+        total_episodes: int,
+    ) -> dict[str, Any]:
+        """Flush collected telemetry samples to SQLite and return the snapshot.
+
+        Called after a batch run completes.  Drains all samples from the
+        collector, computes the snapshot, persists them with the run metadata,
+        and returns the computed snapshot dict.
+
+        IMPORTANT: This drains the collector (destructive).  The returned dict
+        IS the snapshot -- do NOT call telemetry_snapshot() after this, as the
+        collector will be empty.
+
+        Args:
+            run_id: Batch run ID to tag the samples with.
+            started_at: Batch start timestamp (time.time()).
+            ended_at: Batch end timestamp (time.time()).
+            total_episodes: Number of episodes completed.
+
+        Returns:
+            Snapshot dict with metrics, throughput, cache_hit_rate, and breaches.
+            Empty dict if no telemetry data was collected.
+        """
+        if self._telemetry is None:
+            return {}
+
+        from lunar_sandbox.telemetry.compute import compute_snapshot
+        from lunar_sandbox.telemetry.store import TelemetryStore
+
+        samples = self._telemetry.drain()
+        if not samples:
+            return {"metrics": {}, "throughput_eps_per_min": 0.0, "cache_hit_rate": 0.0, "breaches": []}
+
+        duration = ended_at - started_at if ended_at > started_at else 0.0
+        snapshot = compute_snapshot(samples, run_id, duration)
+
+        # Convert to dict BEFORE persisting (we need the snapshot object for both)
+        snapshot_data = self._snapshot_to_dict(snapshot)
+
+        db_path = self._config.trajectory_dir / "trajectories.db"
+        store = TelemetryStore(db_path)
+        store.open()
+        try:
+            store.save_run(
+                run_id=run_id,
+                samples=samples,
+                started_at=started_at,
+                ended_at=ended_at,
+                total_episodes=total_episodes,
+                throughput=snapshot.throughput_eps_per_min,
+                cache_hit_rate=snapshot.cache_hit_rate,
+            )
+        finally:
+            store.close()
+
+        return snapshot_data
 
     @property
     def trajectory_store(self) -> TrajectoryStore | None:
