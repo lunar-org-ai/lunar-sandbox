@@ -1,0 +1,11 @@
+{
+  "name": "@lunar/types",
+  "private": true,
+  "version": "0.0.0",
+  "types": "./src/api.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/api.d.ts"
+    }
+  }
+}
