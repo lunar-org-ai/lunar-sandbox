@@ -8,12 +8,14 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.135.1",
     "pydantic>=2.12",
     "pyseccomp>=0.1",
     "pyyaml>=6.0",
     "structlog>=24.0",
     "typer>=0.21.0",
     "rich>=14.0",
+    "uvicorn[standard]>=0.34",
 ]
 
 [project.optional-dependencies]
