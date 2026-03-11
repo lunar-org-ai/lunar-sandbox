@@ -25,6 +25,7 @@ __all__ = [
     "TaskSummary",
     "TelemetryRunDetail",
     "TelemetryRunSummary",
+    "WsEnvelope",
 ]
 
 
@@ -142,3 +143,29 @@ class HealthResponse(BaseModel):
     status: str  # "ok" or "degraded"
     engine_started: bool
     stores_available: bool
+
+
+# ---------------------------------------------------------------------------
+# WebSocket
+# ---------------------------------------------------------------------------
+
+
+class WsEnvelope(BaseModel):
+    """WebSocket message envelope.
+
+    Every message sent over the WebSocket connection is wrapped in this
+    envelope.  The ``payload`` dict reuses the same shapes as REST
+    responses so the codegen pipeline produces TypeScript types for both.
+    """
+
+    type: str
+    """Event type, e.g. ``"trace_event"``, ``"sandbox_status"``."""
+
+    topic: str
+    """Hierarchical topic, e.g. ``"sandbox:abc123:episode:ep456"``."""
+
+    timestamp: float
+    """Unix timestamp (seconds since epoch)."""
+
+    payload: dict[str, Any]
+    """Event data — reuses existing schema shapes."""
