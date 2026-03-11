@@ -23,6 +23,7 @@ from fastapi.exceptions import HTTPException
 from lunar_sandbox.api.errors import generic_exception_handler, http_exception_handler
 from lunar_sandbox.api.routers import (
     episodes_router,
+    runs_router,
     sandboxes_router,
     tasks_router,
     telemetry_router,
@@ -110,6 +111,7 @@ app.add_exception_handler(Exception, generic_exception_handler)  # type: ignore[
 
 # Include domain routers
 app.include_router(episodes_router)
+app.include_router(runs_router)
 app.include_router(sandboxes_router)
 app.include_router(tasks_router)
 app.include_router(telemetry_router)

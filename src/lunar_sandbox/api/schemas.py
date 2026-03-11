@@ -21,6 +21,8 @@ __all__ = [
     "PaginatedTasks",
     "PaginatedTelemetryRuns",
     "PoolStatus",
+    "RunLaunchResponse",
+    "RunRequest",
     "SandboxInfo",
     "TaskSummary",
     "TelemetryRunDetail",
@@ -43,6 +45,7 @@ class EpisodeSummary(BaseModel):
     score: float | None = None
     step_count: int = 0
     duration_ms: float = 0.0
+    cost_usd: float | None = None
     started_at: float = 0.0
     ended_at: float | None = None
 
@@ -94,6 +97,9 @@ class SandboxInfo(BaseModel):
     sandbox_id: str
     fingerprint: str
     state: str
+    started_at: float | None = None
+    cpu_percent: float | None = None
+    memory_mb: float | None = None
 
 
 class PoolStatus(BaseModel):
@@ -143,6 +149,28 @@ class HealthResponse(BaseModel):
     status: str  # "ok" or "degraded"
     engine_started: bool
     stores_available: bool
+
+
+# ---------------------------------------------------------------------------
+# Runs
+# ---------------------------------------------------------------------------
+
+
+class RunRequest(BaseModel):
+    """Request body for launching an evaluation run."""
+
+    task_name: str
+    model: str | None = None
+    parallelism: int = 1
+    timeout: int | None = None
+    env_vars: dict[str, str] | None = None
+
+
+class RunLaunchResponse(BaseModel):
+    """Response returned after a run is successfully launched."""
+
+    run_id: str
+    episode_id: str
 
 
 # ---------------------------------------------------------------------------

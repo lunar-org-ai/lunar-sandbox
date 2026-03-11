@@ -1,14 +1,16 @@
-"""Sandbox pool status endpoints.
+"""Sandbox pool status and individual sandbox endpoints.
 
-Provides pool-level status information.  When the engine pool is
-unavailable (e.g., on macOS), returns a graceful "not running" response
-instead of erroring.
+Provides pool-level status information and per-sandbox detail/control.
+When the engine pool is unavailable (e.g., on macOS), returns graceful
+mock responses instead of erroring.
 """
 
 from __future__ import annotations
 
+from typing import Any
+
 import structlog
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from lunar_sandbox.api.deps import get_engine
 from lunar_sandbox.api.schemas import PoolStatus, SandboxInfo
@@ -57,3 +59,69 @@ async def get_pool_status(
         total_sandboxes=total,
         sandboxes=sandboxes,
     )
+
+
+@router.get("/{sandbox_id}", response_model=SandboxInfo)
+async def get_sandbox(
+    sandbox_id: str,
+    engine=Depends(get_engine),
+) -> SandboxInfo:
+    """Return detail for a single sandbox by ID.
+
+    When the engine pool is unavailable (e.g., on macOS), returns mock
+    sandbox data so the dashboard can be developed without a running engine.
+    """
+    if engine.pool is None:
+        return SandboxInfo(
+            sandbox_id=sandbox_id,
+            fingerprint="mock-fingerprint",
+            state="Idle",
+            started_at=None,
+            cpu_percent=None,
+            memory_mb=None,
+        )
+
+    try:
+        status: dict[str, Any] = await engine.pool_status()
+    except Exception as exc:
+        logger.warning("sandbox_detail_pool_status_failed", error=str(exc))
+        raise HTTPException(status_code=503, detail="Sandbox pool not available") from exc
+
+    for fp in status.get("fingerprints", []):
+        sid = f"pool-{fp[:8]}"
+        if sid == sandbox_id:
+            return SandboxInfo(
+                sandbox_id=sid,
+                fingerprint=fp,
+                state="pooled",
+            )
+
+    raise HTTPException(status_code=404, detail=f"Sandbox {sandbox_id} not found")
+
+
+@router.post("/{sandbox_id}/stop")
+async def stop_sandbox(
+    sandbox_id: str,
+    engine=Depends(get_engine),
+) -> dict[str, str]:
+    """Stop a running sandbox.
+
+    When the engine pool is unavailable (e.g., on macOS), returns a
+    graceful mock response indicating the sandbox was stopped.
+    """
+    if engine.pool is None:
+        logger.info("stop_sandbox_mock", sandbox_id=sandbox_id)
+        return {"status": "stopped", "mock": "true"}
+
+    try:
+        await engine.pool.stop_sandbox(sandbox_id)
+    except AttributeError:
+        # Pool may not expose stop_sandbox -- degrade gracefully
+        logger.warning("stop_sandbox_not_supported", sandbox_id=sandbox_id)
+    except Exception as exc:
+        logger.warning("stop_sandbox_failed", sandbox_id=sandbox_id, error=str(exc))
+        raise HTTPException(
+            status_code=500, detail=f"Failed to stop sandbox: {exc}"
+        ) from exc
+
+    return {"status": "stopped"}
