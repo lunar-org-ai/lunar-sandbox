@@ -907,6 +907,36 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WsEnvelope": {
+        "description": "WebSocket message envelope.\n\nEvery message sent over the WebSocket connection is wrapped in this\nenvelope.  The ``payload`` dict reuses the same shapes as REST\nresponses so the codegen pipeline produces TypeScript types for both.",
+        "properties": {
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "topic": {
+            "title": "Topic",
+            "type": "string"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "number"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          }
+        },
+        "required": [
+          "type",
+          "topic",
+          "timestamp",
+          "payload"
+        ],
+        "title": "WsEnvelope",
+        "type": "object"
       }
     }
   }

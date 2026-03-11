@@ -440,6 +440,26 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /**
+         * WsEnvelope
+         * @description WebSocket message envelope.
+         *
+         *     Every message sent over the WebSocket connection is wrapped in this
+         *     envelope.  The ``payload`` dict reuses the same shapes as REST
+         *     responses so the codegen pipeline produces TypeScript types for both.
+         */
+        WsEnvelope: {
+            /** Type */
+            type: string;
+            /** Topic */
+            topic: string;
+            /** Timestamp */
+            timestamp: number;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+        };
     };
     responses: never;
     parameters: never;
