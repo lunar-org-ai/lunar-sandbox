@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import heapq
+import time
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Callable
 from uuid import uuid4
@@ -42,6 +43,7 @@ from lunar_sandbox.pool.metrics import PoolMetrics
 
 if TYPE_CHECKING:
     from lunar_sandbox.sandbox.sandbox import Sandbox
+    from lunar_sandbox.telemetry.collector import TelemetryCollector
 
 __all__ = ["SandboxPool"]
 
@@ -79,12 +81,14 @@ class SandboxPool:
         "_background_tasks",
         "_running",
         "_log",
+        "_telemetry",
     )
 
     def __init__(
         self,
         config: PoolConfig,
         sandbox_factory: Callable[..., object] | None = None,
+        telemetry_collector: TelemetryCollector | None = None,
     ) -> None:
         self._config = config
         self._idle_pools: dict[str, OrderedDict[str, PoolEntry]] = {}
@@ -103,6 +107,7 @@ class SandboxPool:
         self._background_tasks: set[asyncio.Task[None]] = set()
         self._running = False
         self._log = structlog.get_logger(__name__).bind(component="pool")
+        self._telemetry = telemetry_collector
 
     # ------------------------------------------------------------------
     # Public API
@@ -142,6 +147,8 @@ class SandboxPool:
             sandbox = await self._try_checkout(fingerprint)
             if sandbox is not None:
                 self._metrics.record_hit(fingerprint)
+                if self._telemetry is not None:
+                    self._telemetry.record("cache_hit", 1.0, fingerprint=fingerprint)
                 self._metrics.active_count = len(self._active)
                 self._metrics.idle_count = self._total_idle()
                 self._condition.notify()
@@ -198,6 +205,8 @@ class SandboxPool:
                 sandbox = await self._try_checkout(fingerprint)
                 if sandbox is not None:
                     self._metrics.record_hit(fingerprint)
+                    if self._telemetry is not None:
+                        self._telemetry.record("cache_hit", 1.0, fingerprint=fingerprint)
                     self._metrics.active_count = len(self._active)
                     self._metrics.idle_count = self._total_idle()
                     self._condition.notify()
@@ -216,6 +225,8 @@ class SandboxPool:
             entry.mark_used()
             self._active[sandbox.config.sandbox_id] = entry
             self._metrics.record_miss(fingerprint, cold_start=cold_start)
+            if self._telemetry is not None:
+                self._telemetry.record("cache_hit", 0.0, fingerprint=fingerprint)
             self._metrics.active_count = len(self._active)
             self._metrics.idle_count = self._total_idle()
             self._condition.notify()
@@ -479,7 +490,13 @@ class SandboxPool:
         sandbox is destroyed.
         """
         try:
+            reset_start = time.monotonic()
             reset_ok = await asyncio.to_thread(entry.sandbox.reset)
+            if self._telemetry is not None:
+                reset_ms = (time.monotonic() - reset_start) * 1000
+                self._telemetry.record(
+                    "reset_latency", reset_ms, fingerprint=entry.fingerprint
+                )
         except Exception:
             self._log.exception(
                 "pool_reset_exception",

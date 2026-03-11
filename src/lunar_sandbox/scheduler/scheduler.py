@@ -45,6 +45,7 @@ from lunar_sandbox.scheduler.store import BatchResultStore
 if TYPE_CHECKING:
     from lunar_sandbox.pool.pool import SandboxPool
     from lunar_sandbox.task.schema import TaskDefinition
+    from lunar_sandbox.telemetry.collector import TelemetryCollector
 
 __all__ = ["BatchScheduler"]
 
@@ -63,16 +64,18 @@ class BatchScheduler:
             with sensible defaults when ``None``.
     """
 
-    __slots__ = ("_pool", "_config", "_log")
+    __slots__ = ("_pool", "_config", "_log", "_telemetry")
 
     def __init__(
         self,
         pool: SandboxPool,
         config: BatchConfig | None = None,
+        telemetry_collector: TelemetryCollector | None = None,
     ) -> None:
         self._pool = pool
         self._config = config if config is not None else BatchConfig()
         self._log = structlog.get_logger(__name__).bind(component="scheduler")
+        self._telemetry = telemetry_collector
 
     # ------------------------------------------------------------------
     # Public API
@@ -309,7 +312,13 @@ class BatchScheduler:
         sandbox = None
 
         try:
+            alloc_start = time.monotonic()
             sandbox = await self._pool.acquire(fingerprint)
+            if self._telemetry is not None:
+                alloc_ms = (time.monotonic() - alloc_start) * 1000
+                self._telemetry.record(
+                    "allocate_latency", alloc_ms, fingerprint=fingerprint
+                )
 
             # Create agent inside bounded section (pitfall 6)
             agent = agent_factory(task)
@@ -319,6 +328,7 @@ class BatchScheduler:
                 task=task,
                 agent_adapter=agent,
                 trajectory_dir=config.trajectory_dir,
+                telemetry_collector=self._telemetry,
             )
 
             # Per-task timeout via asyncio.wait_for
@@ -329,6 +339,13 @@ class BatchScheduler:
                 )
             else:
                 episode_result = await runner.run()
+
+            # Record episode duration for successful completions
+            if self._telemetry is not None:
+                duration_ms = (time.monotonic() - start_time) * 1000
+                self._telemetry.record(
+                    "episode_duration", duration_ms, fingerprint=fingerprint
+                )
 
             return TaskResult.from_episode(
                 task.name, episode_result, start_time
