@@ -12,7 +12,7 @@
           "episodes"
         ],
         "summary": "List Episodes",
-        "description": "List episodes with optional task_name filter and pagination.",
+        "description": "List episodes with optional filters and pagination.\n\nSupports filtering by task_name, outcome, date range (date_from/date_to\nas unix timestamps), and minimum score.  Results can be sorted by any\nepisode field using sort_by and sort_order (\"asc\" or \"desc\").",
         "operationId": "list_episodes_api_episodes_get",
         "parameters": [
           {
@@ -29,6 +29,90 @@
                 }
               ],
               "title": "Task Name"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outcome"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "score_min",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Score Min"
+            }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "started_at",
+              "title": "Sort By"
+            }
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "desc",
+              "title": "Sort Order"
             }
           },
           {
@@ -126,6 +210,48 @@
         }
       }
     },
+    "/api/runs": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Launch Run",
+        "description": "Launch an evaluation run and return IDs immediately.\n\nWhen the engine pool is unavailable (e.g., on macOS), returns mock\nIDs so the dashboard can be developed without a running engine.",
+        "operationId": "launch_run_api_runs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunLaunchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sandboxes": {
       "get": {
         "tags": [
@@ -141,6 +267,96 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PoolStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sandboxes/{sandbox_id}": {
+      "get": {
+        "tags": [
+          "sandboxes"
+        ],
+        "summary": "Get Sandbox",
+        "description": "Return detail for a single sandbox by ID.\n\nWhen the engine pool is unavailable (e.g., on macOS), returns mock\nsandbox data so the dashboard can be developed without a running engine.",
+        "operationId": "get_sandbox_api_sandboxes__sandbox_id__get",
+        "parameters": [
+          {
+            "name": "sandbox_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sandbox Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sandboxes/{sandbox_id}/stop": {
+      "post": {
+        "tags": [
+          "sandboxes"
+        ],
+        "summary": "Stop Sandbox",
+        "description": "Stop a running sandbox.\n\nWhen the engine pool is unavailable (e.g., on macOS), returns a\ngraceful mock response indicating the sandbox was stopped.",
+        "operationId": "stop_sandbox_api_sandboxes__sandbox_id__stop_post",
+        "parameters": [
+          {
+            "name": "sandbox_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sandbox Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Stop Sandbox Api Sandboxes  Sandbox Id  Stop Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -416,6 +632,17 @@
             "title": "Duration Ms",
             "default": 0.0
           },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
           "started_at": {
             "type": "number",
             "title": "Started At",
@@ -495,6 +722,17 @@
             "type": "number",
             "title": "Duration Ms",
             "default": 0.0
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
           },
           "started_at": {
             "type": "number",
@@ -682,6 +920,80 @@
         "title": "PoolStatus",
         "description": "Current sandbox pool status."
       },
+      "RunLaunchResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "episode_id": {
+            "type": "string",
+            "title": "Episode Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "episode_id"
+        ],
+        "title": "RunLaunchResponse",
+        "description": "Response returned after a run is successfully launched."
+      },
+      "RunRequest": {
+        "properties": {
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "parallelism": {
+            "type": "integer",
+            "title": "Parallelism",
+            "default": 1
+          },
+          "timeout": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout"
+          },
+          "env_vars": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Env Vars"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_name"
+        ],
+        "title": "RunRequest",
+        "description": "Request body for launching an evaluation run."
+      },
       "SandboxInfo": {
         "properties": {
           "sandbox_id": {
@@ -695,6 +1007,39 @@
           "state": {
             "type": "string",
             "title": "State"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "cpu_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Percent"
+          },
+          "memory_mb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Mb"
           }
         },
         "type": "object",

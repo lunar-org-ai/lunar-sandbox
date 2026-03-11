@@ -13,7 +13,11 @@ export interface paths {
         };
         /**
          * List Episodes
-         * @description List episodes with optional task_name filter and pagination.
+         * @description List episodes with optional filters and pagination.
+         *
+         *     Supports filtering by task_name, outcome, date range (date_from/date_to
+         *     as unix timestamps), and minimum score.  Results can be sorted by any
+         *     episode field using sort_by and sort_order ("asc" or "desc").
          */
         get: operations["list_episodes_api_episodes_get"];
         put?: never;
@@ -44,6 +48,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Launch Run
+         * @description Launch an evaluation run and return IDs immediately.
+         *
+         *     When the engine pool is unavailable (e.g., on macOS), returns mock
+         *     IDs so the dashboard can be developed without a running engine.
+         */
+        post: operations["launch_run_api_runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sandboxes": {
         parameters: {
             query?: never;
@@ -61,6 +88,52 @@ export interface paths {
         get: operations["get_pool_status_api_sandboxes_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sandboxes/{sandbox_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Sandbox
+         * @description Return detail for a single sandbox by ID.
+         *
+         *     When the engine pool is unavailable (e.g., on macOS), returns mock
+         *     sandbox data so the dashboard can be developed without a running engine.
+         */
+        get: operations["get_sandbox_api_sandboxes__sandbox_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sandboxes/{sandbox_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop Sandbox
+         * @description Stop a running sandbox.
+         *
+         *     When the engine pool is unavailable (e.g., on macOS), returns a
+         *     graceful mock response indicating the sandbox was stopped.
+         */
+        post: operations["stop_sandbox_api_sandboxes__sandbox_id__stop_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -197,6 +270,8 @@ export interface components {
              * @default 0
              */
             duration_ms: number;
+            /** Cost Usd */
+            cost_usd?: number | null;
             /**
              * Started At
              * @default 0
@@ -245,6 +320,8 @@ export interface components {
              * @default 0
              */
             duration_ms: number;
+            /** Cost Usd */
+            cost_usd?: number | null;
             /**
              * Started At
              * @default 0
@@ -328,6 +405,37 @@ export interface components {
             sandboxes: components["schemas"]["SandboxInfo"][];
         };
         /**
+         * RunLaunchResponse
+         * @description Response returned after a run is successfully launched.
+         */
+        RunLaunchResponse: {
+            /** Run Id */
+            run_id: string;
+            /** Episode Id */
+            episode_id: string;
+        };
+        /**
+         * RunRequest
+         * @description Request body for launching an evaluation run.
+         */
+        RunRequest: {
+            /** Task Name */
+            task_name: string;
+            /** Model */
+            model?: string | null;
+            /**
+             * Parallelism
+             * @default 1
+             */
+            parallelism: number;
+            /** Timeout */
+            timeout?: number | null;
+            /** Env Vars */
+            env_vars?: {
+                [key: string]: string;
+            } | null;
+        };
+        /**
          * SandboxInfo
          * @description Information about a single sandbox instance.
          */
@@ -338,6 +446,12 @@ export interface components {
             fingerprint: string;
             /** State */
             state: string;
+            /** Started At */
+            started_at?: number | null;
+            /** Cpu Percent */
+            cpu_percent?: number | null;
+            /** Memory Mb */
+            memory_mb?: number | null;
         };
         /**
          * TaskSummary
@@ -473,6 +587,12 @@ export interface operations {
         parameters: {
             query?: {
                 task_name?: string | null;
+                outcome?: string | null;
+                date_from?: number | null;
+                date_to?: number | null;
+                score_min?: number | null;
+                sort_by?: string;
+                sort_order?: string;
                 /** @description Zero-based offset */
                 offset?: number;
                 /** @description Max items to return */
@@ -535,6 +655,39 @@ export interface operations {
             };
         };
     };
+    launch_run_api_runs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunLaunchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_pool_status_api_sandboxes_get: {
         parameters: {
             query?: never;
@@ -551,6 +704,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PoolStatus"];
+                };
+            };
+        };
+    };
+    get_sandbox_api_sandboxes__sandbox_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sandbox_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SandboxInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_sandbox_api_sandboxes__sandbox_id__stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sandbox_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
