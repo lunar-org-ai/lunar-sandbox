@@ -86,6 +86,7 @@ class EpisodeRunner:
         episode_id: str | None = None,
         agent_adapter: AgentAdapter | None = None,
         trajectory_dir: Path | None = None,
+        telemetry_collector: Any | None = None,
     ) -> None:
         self._sandbox = sandbox
         self._task = task
@@ -99,6 +100,7 @@ class EpisodeRunner:
         self._trajectory_dir = trajectory_dir
         self._writer: TrajectoryWriter | None = None
         self._state_tracker: StepStateTracker | None = None
+        self._telemetry = telemetry_collector
         self._log = log.bind(episode_id=self._episode_id)
 
     # ------------------------------------------------------------------
@@ -326,6 +328,8 @@ class EpisodeRunner:
 
         # Agent-driven loop
         observation: ActionResponse | None = None
+        phase_run_start = time.monotonic()
+        first_action_recorded = False
         try:
             while True:
                 # Check deadline
@@ -363,6 +367,17 @@ class EpisodeRunner:
                 start_ts = time.time()
                 response = await self._client.send_action(action, params)
                 duration_ms = (time.time() - start_ts) * 1000
+
+                # Record time-to-first-action telemetry (once per episode)
+                if not first_action_recorded and self._telemetry is not None:
+                    first_action_ms = (time.monotonic() - phase_run_start) * 1000
+                    fp = ""
+                    if hasattr(self._task, "derive_fingerprint"):
+                        fp = self._task.derive_fingerprint()
+                    self._telemetry.record(
+                        "time_to_first_action", first_action_ms, fingerprint=fp
+                    )
+                    first_action_recorded = True
 
                 # Record trace
                 self._record_trace_event(
