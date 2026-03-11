@@ -6,6 +6,9 @@
   "exports": {
     ".": {
       "types": "./src/api.d.ts"
+    },
+    "./api": {
+      "types": "./src/api.d.ts"
     }
   }
 }
