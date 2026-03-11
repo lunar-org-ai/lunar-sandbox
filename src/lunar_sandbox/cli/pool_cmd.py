@@ -127,6 +127,7 @@ def _status_impl(*, json_output: bool, human_output: bool) -> None:
     # Full status available
     if mode == OutputMode.JSON:
         pool_data["pid"] = daemon_pid
+        _enrich_json_with_telemetry(pool_data)
         print_json(pool_data)
     else:
         _render_pool_status(pool_data, daemon_pid)
@@ -166,6 +167,9 @@ def _render_pool_status(data: dict[str, Any], pid: int) -> None:
         for fp in fingerprints:
             table.add_row(fp, str(targets.get(fp, "-")))
         console.print(table)
+
+    # Brief telemetry summary (if data exists)
+    _render_brief_telemetry()
 
 
 # ---------------------------------------------------------------------------
@@ -387,6 +391,81 @@ def _stop_impl(*, json_output: bool) -> None:
 
     # Clean up any leftover files
     _cleanup_daemon_files()
+
+
+# ---------------------------------------------------------------------------
+# Telemetry enrichment (optional -- never breaks pool status)
+# ---------------------------------------------------------------------------
+
+
+def _render_brief_telemetry() -> None:
+    """Render a brief telemetry summary below pool status (if data exists)."""
+    try:
+        from rich.text import Text
+
+        from lunar_sandbox.telemetry.store import TelemetryStore
+
+        db_path = Path("trajectories") / "trajectories.db"
+        if not db_path.exists():
+            return
+
+        store = TelemetryStore(db_path)
+        store.open()
+        try:
+            runs = store.query_runs(limit=1)
+            if not runs:
+                return
+
+            latest = runs[0]
+            telem_text = Text()
+            telem_text.append("\nTelemetry ", style="bold dim")
+            telem_text.append(f"(run: {latest['run_id'][:16]})", style="dim")
+
+            cache_rate = latest.get("cache_hit_rate")
+            if cache_rate is not None:
+                telem_text.append(f"\n  Cache hit rate: {cache_rate:.1%}")
+
+            # Fetch allocate_latency samples for avg
+            samples = store.query_samples(
+                latest["run_id"], metric="allocate_latency"
+            )
+            if samples:
+                avg_alloc = sum(s["value"] for s in samples) / len(samples)
+                telem_text.append(f"\n  Avg allocate:   {avg_alloc:.1f}ms")
+
+            telem_text.append(
+                "\n  Use 'lunar telemetry' for full details", style="dim"
+            )
+            console.print(telem_text)
+        finally:
+            store.close()
+    except Exception:
+        pass  # Telemetry is optional -- never break pool status
+
+
+def _enrich_json_with_telemetry(pool_data: dict[str, Any]) -> None:
+    """Add a telemetry_summary field to JSON pool status output."""
+    try:
+        from lunar_sandbox.telemetry.store import TelemetryStore
+
+        db_path = Path("trajectories") / "trajectories.db"
+        if not db_path.exists():
+            return
+
+        store = TelemetryStore(db_path)
+        store.open()
+        try:
+            runs = store.query_runs(limit=1)
+            if runs:
+                pool_data["telemetry_summary"] = {
+                    "run_id": runs[0]["run_id"],
+                    "cache_hit_rate": runs[0].get("cache_hit_rate"),
+                    "throughput_eps_per_min": runs[0].get("throughput_eps_per_min"),
+                }
+        finally:
+            store.close()
+    except Exception:
+        pass  # Telemetry is optional -- never break pool status
 
 
 # ---------------------------------------------------------------------------
