@@ -1,0 +1,913 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LunarEngine API",
+    "description": "REST API for the Lunar Sandbox evaluation engine",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/episodes": {
+      "get": {
+        "tags": [
+          "episodes"
+        ],
+        "summary": "List Episodes",
+        "description": "List episodes with optional task_name filter and pagination.",
+        "operationId": "list_episodes_api_episodes_get",
+        "parameters": [
+          {
+            "name": "task_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Task Name"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Zero-based offset",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Zero-based offset"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Max items to return",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Max items to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedEpisodes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/episodes/{episode_id}": {
+      "get": {
+        "tags": [
+          "episodes"
+        ],
+        "summary": "Get Episode",
+        "description": "Get full episode detail including steps.",
+        "operationId": "get_episode_api_episodes__episode_id__get",
+        "parameters": [
+          {
+            "name": "episode_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Episode Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EpisodeDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sandboxes": {
+      "get": {
+        "tags": [
+          "sandboxes"
+        ],
+        "summary": "Get Pool Status",
+        "description": "Return current sandbox pool status.\n\nReturns a graceful response when the engine pool is not available\n(e.g., on macOS where Linux kernel features are required).",
+        "operationId": "get_pool_status_api_sandboxes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks": {
+      "get": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "List Tasks",
+        "description": "List tasks that have been evaluated (from episode history).",
+        "operationId": "list_tasks_api_tasks_get",
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Zero-based offset",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Zero-based offset"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Max items to return",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Max items to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedTasks"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{task_name}": {
+      "get": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Get Task",
+        "description": "Get task info by name (from episode history).",
+        "operationId": "get_task_api_tasks__task_name__get",
+        "parameters": [
+          {
+            "name": "task_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/telemetry": {
+      "get": {
+        "tags": [
+          "telemetry"
+        ],
+        "summary": "List Telemetry Runs",
+        "description": "List telemetry runs with pagination.",
+        "operationId": "list_telemetry_runs_api_telemetry_get",
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Zero-based offset",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Zero-based offset"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Max items to return",
+              "default": 20,
+              "title": "Limit"
+            },
+            "description": "Max items to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedTelemetryRuns"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/telemetry/{run_id}": {
+      "get": {
+        "tags": [
+          "telemetry"
+        ],
+        "summary": "Get Telemetry Run",
+        "description": "Get telemetry run detail with raw metric samples.",
+        "operationId": "get_telemetry_run_api_telemetry__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryRunDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health Check",
+        "description": "Return API health status.\n\nReports whether the engine fully started and whether the SQLite\nstores are available for querying.",
+        "operationId": "health_check_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "EpisodeDetail": {
+        "properties": {
+          "episode_id": {
+            "type": "string",
+            "title": "Episode Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "step_count": {
+            "type": "integer",
+            "title": "Step Count",
+            "default": 0
+          },
+          "duration_ms": {
+            "type": "number",
+            "title": "Duration Ms",
+            "default": 0.0
+          },
+          "started_at": {
+            "type": "number",
+            "title": "Started At",
+            "default": 0.0
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "sandbox_id": {
+            "type": "string",
+            "title": "Sandbox Id",
+            "default": ""
+          },
+          "is_complete": {
+            "type": "integer",
+            "title": "Is Complete",
+            "default": 1
+          },
+          "steps": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Steps",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "episode_id",
+          "task_name",
+          "outcome"
+        ],
+        "title": "EpisodeDetail",
+        "description": "Full episode detail including sandbox info and step data."
+      },
+      "EpisodeSummary": {
+        "properties": {
+          "episode_id": {
+            "type": "string",
+            "title": "Episode Id"
+          },
+          "task_name": {
+            "type": "string",
+            "title": "Task Name"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "step_count": {
+            "type": "integer",
+            "title": "Step Count",
+            "default": 0
+          },
+          "duration_ms": {
+            "type": "number",
+            "title": "Duration Ms",
+            "default": 0.0
+          },
+          "started_at": {
+            "type": "number",
+            "title": "Started At",
+            "default": 0.0
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "episode_id",
+          "task_name",
+          "outcome"
+        ],
+        "title": "EpisodeSummary",
+        "description": "Summary of a single evaluation episode."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "engine_started": {
+            "type": "boolean",
+            "title": "Engine Started"
+          },
+          "stores_available": {
+            "type": "boolean",
+            "title": "Stores Available"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "engine_started",
+          "stores_available"
+        ],
+        "title": "HealthResponse",
+        "description": "Health check response."
+      },
+      "PaginatedEpisodes": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EpisodeSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "offset",
+          "limit"
+        ],
+        "title": "PaginatedEpisodes",
+        "description": "Paginated list of episode summaries."
+      },
+      "PaginatedTasks": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TaskSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "offset",
+          "limit"
+        ],
+        "title": "PaginatedTasks",
+        "description": "Paginated list of task summaries."
+      },
+      "PaginatedTelemetryRuns": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TelemetryRunSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "offset",
+          "limit"
+        ],
+        "title": "PaginatedTelemetryRuns",
+        "description": "Paginated list of telemetry run summaries."
+      },
+      "PoolStatus": {
+        "properties": {
+          "running": {
+            "type": "boolean",
+            "title": "Running"
+          },
+          "total_sandboxes": {
+            "type": "integer",
+            "title": "Total Sandboxes"
+          },
+          "sandboxes": {
+            "items": {
+              "$ref": "#/components/schemas/SandboxInfo"
+            },
+            "type": "array",
+            "title": "Sandboxes",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "running",
+          "total_sandboxes"
+        ],
+        "title": "PoolStatus",
+        "description": "Current sandbox pool status."
+      },
+      "SandboxInfo": {
+        "properties": {
+          "sandbox_id": {
+            "type": "string",
+            "title": "Sandbox Id"
+          },
+          "fingerprint": {
+            "type": "string",
+            "title": "Fingerprint"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sandbox_id",
+          "fingerprint",
+          "state"
+        ],
+        "title": "SandboxInfo",
+        "description": "Information about a single sandbox instance."
+      },
+      "TaskSummary": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "runtime": {
+            "type": "string",
+            "title": "Runtime",
+            "default": "python3.12"
+          },
+          "timeout": {
+            "type": "integer",
+            "title": "Timeout",
+            "default": 1800
+          },
+          "max_steps": {
+            "type": "integer",
+            "title": "Max Steps",
+            "default": 200
+          },
+          "instructions": {
+            "type": "string",
+            "title": "Instructions",
+            "default": ""
+          },
+          "test_command": {
+            "type": "string",
+            "title": "Test Command",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "TaskSummary",
+        "description": "Summary of a task definition."
+      },
+      "TelemetryRunDetail": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "started_at": {
+            "type": "number",
+            "title": "Started At",
+            "default": 0.0
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "total_episodes": {
+            "type": "integer",
+            "title": "Total Episodes",
+            "default": 0
+          },
+          "throughput_eps_per_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Throughput Eps Per Min"
+          },
+          "cache_hit_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Hit Rate"
+          },
+          "samples": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Samples",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id"
+        ],
+        "title": "TelemetryRunDetail",
+        "description": "Telemetry run detail with raw metric samples."
+      },
+      "TelemetryRunSummary": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "started_at": {
+            "type": "number",
+            "title": "Started At",
+            "default": 0.0
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "total_episodes": {
+            "type": "integer",
+            "title": "Total Episodes",
+            "default": 0
+          },
+          "throughput_eps_per_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Throughput Eps Per Min"
+          },
+          "cache_hit_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Hit Rate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id"
+        ],
+        "title": "TelemetryRunSummary",
+        "description": "Summary of a telemetry collection run."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
