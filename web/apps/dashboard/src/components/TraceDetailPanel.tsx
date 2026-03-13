@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import {
   FileText,
   FilePen,
@@ -10,16 +9,10 @@ import {
   Terminal,
   TestTubes,
   X,
-  ChevronDown,
-  ChevronRight,
 } from 'lucide-react'
 
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { DiffViewer, type FileDiffEntry } from '@/components/DiffViewer'
 import { formatDurationMs, type TraceSpan } from '@/lib/trace-utils'
 import { cn } from '@/lib/utils'
 
@@ -142,6 +135,36 @@ function KVList({ data }: { data: Record<string, unknown> }) {
 }
 
 // ---------------------------------------------------------------------------
+// extractFileDiffs — pull file_diff entries from span data
+// ---------------------------------------------------------------------------
+
+function extractFileDiffs(span: TraceSpan): FileDiffEntry[] {
+  const raw = (span.observation['file_diff'] ?? span.params['file_diff']) as
+    | { created?: string[]; modified?: string[]; deleted?: string[] }
+    | undefined
+
+  if (!raw) return []
+
+  const files: FileDiffEntry[] = []
+  if (raw.created) {
+    for (const path of raw.created) {
+      files.push({ path, type: 'A' })
+    }
+  }
+  if (raw.modified) {
+    for (const path of raw.modified) {
+      files.push({ path, type: 'M' })
+    }
+  }
+  if (raw.deleted) {
+    for (const path of raw.deleted) {
+      files.push({ path, type: 'D' })
+    }
+  }
+  return files
+}
+
+// ---------------------------------------------------------------------------
 // TraceDetailPanel
 // ---------------------------------------------------------------------------
 
@@ -152,7 +175,6 @@ export function TraceDetailPanel({
   onClose,
 }: TraceDetailPanelProps) {
   const isError = span.status === 'error' || span.status === 'timeout'
-  const [terminalOpen, setTerminalOpen] = useState(isError)
 
   const ActionIcon = getActionIcon(span.action)
   const badge = statusLabel(span.status)
@@ -170,6 +192,9 @@ export function TraceDetailPanel({
   const stderr =
     typeof span.observation['stderr'] === 'string' ? span.observation['stderr'] : null
   const hasTerminalOutput = stdout !== null || stderr !== null
+
+  const fileDiffs = extractFileDiffs(span)
+  const diffCount = fileDiffs.length
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-zinc-900 border-l border-zinc-800">
@@ -235,85 +260,95 @@ export function TraceDetailPanel({
         </div>
 
         {/* -------------------------------------------------------------- */}
-        {/* Section 3: Input/Output with Raw + Formatted tabs               */}
+        {/* Section 3: Main content tabs — I/O | Diffs | Terminal           */}
         {/* -------------------------------------------------------------- */}
-        <div>
-          <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-2">
-            Input / Output
-          </h3>
-          <Tabs defaultValue="formatted">
-            <TabsList className="w-full">
-              <TabsTrigger value="formatted" className="flex-1 text-xs">
-                Formatted
-              </TabsTrigger>
-              <TabsTrigger value="raw" className="flex-1 text-xs">
-                Raw
-              </TabsTrigger>
-            </TabsList>
+        <Tabs defaultValue={isError ? 'terminal' : 'io'}>
+          <TabsList className="w-full">
+            <TabsTrigger value="io" className="flex-1 text-xs">
+              I/O
+            </TabsTrigger>
+            <TabsTrigger value="diffs" className="flex-1 text-xs">
+              {diffCount > 0 ? `Diffs (${diffCount})` : 'Diffs'}
+            </TabsTrigger>
+            <TabsTrigger value="terminal" className="flex-1 text-xs">
+              Terminal
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="formatted">
-              <div className="mt-2 space-y-3 max-h-64 overflow-auto rounded border border-zinc-800 p-3 bg-zinc-950">
-                <div>
-                  <p className="text-xs font-semibold text-zinc-400 mb-1">Input</p>
-                  <KVList data={span.params} />
+          {/* I/O tab — Formatted / Raw sub-tabs */}
+          <TabsContent value="io">
+            <Tabs defaultValue="formatted">
+              <TabsList className="w-full mt-2">
+                <TabsTrigger value="formatted" className="flex-1 text-xs">
+                  Formatted
+                </TabsTrigger>
+                <TabsTrigger value="raw" className="flex-1 text-xs">
+                  Raw
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="formatted">
+                <div className="mt-2 space-y-3 max-h-64 overflow-auto rounded border border-zinc-800 p-3 bg-zinc-950">
+                  <div>
+                    <p className="text-xs font-semibold text-zinc-400 mb-1">Input</p>
+                    <KVList data={span.params} />
+                  </div>
+                  <div className="border-t border-zinc-800 pt-3">
+                    <p className="text-xs font-semibold text-zinc-400 mb-1">Output</p>
+                    <KVList data={span.observation} />
+                  </div>
                 </div>
-                <div className="border-t border-zinc-800 pt-3">
-                  <p className="text-xs font-semibold text-zinc-400 mb-1">Output</p>
-                  <KVList data={span.observation} />
+              </TabsContent>
+
+              <TabsContent value="raw">
+                <pre className="mt-2 text-xs font-mono bg-zinc-950 text-zinc-300 p-3 rounded border border-zinc-800 max-h-64 overflow-auto">
+                  {JSON.stringify({ params: span.params, observation: span.observation }, null, 2)}
+                </pre>
+              </TabsContent>
+            </Tabs>
+          </TabsContent>
+
+          {/* Diffs tab */}
+          <TabsContent value="diffs">
+            <div
+              className="mt-2 rounded border border-zinc-800 overflow-hidden"
+              style={{ minHeight: 200 }}
+            >
+              <DiffViewer files={fileDiffs} />
+            </div>
+          </TabsContent>
+
+          {/* Terminal tab */}
+          <TabsContent value="terminal">
+            <div className="mt-2">
+              {isError ? (
+                <div
+                  className={cn(
+                    'rounded border-l-4 border-red-600 bg-zinc-950 p-3',
+                    'border border-red-900/50',
+                  )}
+                >
+                  <h3 className="text-xs font-semibold text-red-400 uppercase tracking-wide mb-2">
+                    Terminal Output
+                  </h3>
+                  {hasTerminalOutput ? (
+                    <TerminalOutputBlocks stdout={stdout} stderr={stderr} prominent />
+                  ) : (
+                    <p className="text-xs text-zinc-500 italic">No terminal output</p>
+                  )}
                 </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="raw">
-              <pre className="mt-2 text-xs font-mono bg-zinc-950 text-zinc-300 p-3 rounded border border-zinc-800 max-h-64 overflow-auto">
-                {JSON.stringify({ params: span.params, observation: span.observation }, null, 2)}
-              </pre>
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        {/* -------------------------------------------------------------- */}
-        {/* Section 4: Stderr / Stdout                                      */}
-        {/* -------------------------------------------------------------- */}
-        {isError ? (
-          /* Error span: expanded by default, visually prominent */
-          <div
-            className={cn(
-              'rounded border-l-4 border-red-600 bg-zinc-950 p-3',
-              'border border-red-900/50',
-            )}
-          >
-            <h3 className="text-xs font-semibold text-red-400 uppercase tracking-wide mb-2">
-              Terminal Output
-            </h3>
-            {hasTerminalOutput ? (
-              <TerminalOutputBlocks stdout={stdout} stderr={stderr} prominent />
-            ) : (
-              <p className="text-xs text-zinc-500 italic">No terminal output</p>
-            )}
-          </div>
-        ) : (
-          /* Normal span: collapsible, collapsed by default */
-          <Collapsible open={terminalOpen} onOpenChange={setTerminalOpen}>
-            <CollapsibleTrigger className="flex w-full items-center gap-1 text-xs font-semibold text-zinc-400 uppercase tracking-wide hover:text-zinc-300 transition-colors">
-              {terminalOpen ? (
-                <ChevronDown className="size-3" />
               ) : (
-                <ChevronRight className="size-3" />
+                <div className="rounded border border-zinc-800 bg-zinc-950 p-3">
+                  {hasTerminalOutput ? (
+                    <TerminalOutputBlocks stdout={stdout} stderr={stderr} prominent={false} />
+                  ) : (
+                    <p className="text-xs text-zinc-500 italic">No terminal output</p>
+                  )}
+                </div>
               )}
-              Terminal Output
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="mt-2">
-                {hasTerminalOutput ? (
-                  <TerminalOutputBlocks stdout={stdout} stderr={stderr} prominent={false} />
-                ) : (
-                  <p className="text-xs text-zinc-500 italic">No terminal output</p>
-                )}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   )
