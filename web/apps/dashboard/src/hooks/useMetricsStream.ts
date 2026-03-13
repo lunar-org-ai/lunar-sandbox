@@ -85,21 +85,35 @@ export function useMetricsStream(topic: string | null): UseMetricsStreamReturn {
     if (!lastEvent || lastEvent.type !== 'telemetry_metric') return
 
     const payload = lastEvent.payload as Record<string, unknown>
-    const metricName = payload['metric'] as string | undefined
-    const value = payload['value']
 
-    if (!metricName || !isMetricKey(metricName) || typeof value !== 'number') return
+    // Emitter sends batched samples: { samples: [{metric, value, unit}, ...] }
+    const samples = payload['samples'] as
+      | { metric: string; value: number; unit?: string }[]
+      | undefined
 
-    // Mutate the ref in place
-    const metricState = metricsRef.current[metricName]
-    const nextValues = [...metricState.values, value]
-    if (nextValues.length > MAX_SPARKLINE_POINTS) {
-      nextValues.shift()
+    if (!Array.isArray(samples) || samples.length === 0) return
+
+    let updated = false
+    for (const sample of samples) {
+      const metricName = sample.metric
+      const value = sample.value
+      if (!metricName || !isMetricKey(metricName) || typeof value !== 'number')
+        continue
+
+      // Mutate the ref in place
+      const metricState = metricsRef.current[metricName]
+      const nextValues = [...metricState.values, value]
+      if (nextValues.length > MAX_SPARKLINE_POINTS) {
+        nextValues.shift()
+      }
+      metricsRef.current = {
+        ...metricsRef.current,
+        [metricName]: { values: nextValues, current: value },
+      }
+      updated = true
     }
-    metricsRef.current = {
-      ...metricsRef.current,
-      [metricName]: { values: nextValues, current: value },
-    }
+
+    if (!updated) return
 
     // Throttle state update to at most every 200ms
     if (throttleTimerRef.current === null) {
