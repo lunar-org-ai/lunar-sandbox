@@ -1,4 +1,4 @@
-import { Download, Home, List, Play } from 'lucide-react'
+import { Activity, Download, Home, List, Play } from 'lucide-react'
 import { Link, useLocation } from 'react-router'
 
 import {
@@ -17,6 +17,7 @@ const navItems = [
   { title: 'Home', url: '/', icon: Home },
   { title: 'New Run', url: '/launcher', icon: Play },
   { title: 'Runs', url: '/runs', icon: List },
+  { title: 'Pool', url: '/pool', icon: Activity },
   { title: 'Export', url: '/export', icon: Download },
 ]
 

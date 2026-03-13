@@ -11,6 +11,7 @@ import SandboxDetail from '@/routes/SandboxDetail'
 import BatchDetail from '@/routes/BatchDetail'
 import EpisodeReplay from '@/routes/EpisodeReplay'
 import Export from '@/routes/Export'
+import PoolHealth from '@/routes/PoolHealth'
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
               <Route path="/batches/:id" element={<BatchDetail />} />
               <Route path="/replay/:id" element={<EpisodeReplay />} />
               <Route path="/export" element={<Export />} />
+              <Route path="/pool" element={<PoolHealth />} />
             </Routes>
           </main>
         </div>
