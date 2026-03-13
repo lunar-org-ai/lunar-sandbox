@@ -87,6 +87,8 @@ export async function launchRun(params: {
   parallelism?: number
   timeout?: number
   env_vars?: Record<string, string>
+  cpu_cores?: number
+  memory_mb?: number
 }): Promise<RunLaunchResponse> {
   const res = await fetch('/api/runs', {
     method: 'POST',

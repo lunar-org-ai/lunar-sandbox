@@ -70,6 +70,8 @@ export default function Launcher() {
 
   // Advanced params
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [cpuCores, setCpuCores] = useState('')
+  const [memoryMb, setMemoryMb] = useState('')
   const [timeout, setTimeout_] = useState('')
   const [envVarsRaw, setEnvVarsRaw] = useState('')
 
@@ -110,6 +112,8 @@ export default function Launcher() {
         parallelism: parseInt(parallelism, 10),
         timeout: timeout ? parseInt(timeout, 10) : undefined,
         env_vars: parseEnvVars(envVarsRaw),
+        cpu_cores: cpuCores ? parseInt(cpuCores, 10) : undefined,
+        memory_mb: memoryMb ? parseInt(memoryMb, 10) : undefined,
       })
       navigate(`/runs/${response.episode_id}`)
     } catch (e) {
@@ -240,6 +244,41 @@ export default function Launcher() {
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-4 pt-4">
+            {/* CPU Cores */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-neutral-200">
+                CPU Cores
+              </label>
+              <Input
+                type="number"
+                placeholder="e.g., 2"
+                value={cpuCores}
+                onChange={(e) => setCpuCores(e.target.value)}
+                min={1}
+              />
+              <p className="text-xs text-neutral-500">
+                Number of CPU cores per sandbox. Leave blank for engine default.
+              </p>
+            </div>
+
+            {/* Memory (MB) */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-neutral-200">
+                Memory (MB)
+              </label>
+              <Input
+                type="number"
+                placeholder="e.g., 1024"
+                value={memoryMb}
+                onChange={(e) => setMemoryMb(e.target.value)}
+                min={64}
+                step={64}
+              />
+              <p className="text-xs text-neutral-500">
+                Memory limit in megabytes per sandbox. Leave blank for engine default.
+              </p>
+            </div>
+
             {/* Timeout */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-neutral-200">
