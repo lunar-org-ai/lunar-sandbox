@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@dagrejs/dagre": "^2.0.4",
+    "@git-diff-view/react": "^0.1.2",
     "@lunar/types": "workspace:*",
     "@tanstack/react-table": "^8.21.3",
     "@xyflow/react": "^12.10.1",

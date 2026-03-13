@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "@xyflow/react/dist/style.css" layer(base);
+@import "@git-diff-view/react/styles/diff-view-pure.css" layer(base);
 
 @custom-variant dark (&:is(.dark *));
 
