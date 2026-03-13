@@ -196,6 +196,37 @@ export function TraceDetailPanel({
   const fileDiffs = extractFileDiffs(span)
   const diffCount = fileDiffs.length
 
+  // Cost & token fields from observation or params
+  const cost_usd =
+    (span.observation['cost_usd'] as number | undefined) ??
+    (span.params['cost_usd'] as number | undefined)
+  const token_count_in =
+    (span.observation['token_count_in'] as number | undefined) ??
+    (span.params['token_count_in'] as number | undefined)
+  const token_count_out =
+    (span.observation['token_count_out'] as number | undefined) ??
+    (span.params['token_count_out'] as number | undefined)
+  const model =
+    (span.observation['model'] as string | undefined) ??
+    (span.params['model'] as string | undefined)
+
+  const hasCostTokenData =
+    cost_usd !== undefined ||
+    token_count_in !== undefined ||
+    token_count_out !== undefined ||
+    model !== undefined
+
+  // Per-token rates: only when model and both token counts and cost are available
+  const rateIn =
+    cost_usd !== undefined && token_count_in !== undefined && token_count_in > 0
+      ? (cost_usd / token_count_in) * 1000
+      : undefined
+  const rateOut =
+    cost_usd !== undefined && token_count_out !== undefined && token_count_out > 0
+      ? (cost_usd / token_count_out) * 1000
+      : undefined
+  const showRates = model !== undefined && rateIn !== undefined && rateOut !== undefined
+
   return (
     <div className="flex h-full flex-col overflow-hidden bg-zinc-900 border-l border-zinc-800">
       {/* ------------------------------------------------------------------ */}
@@ -260,7 +291,38 @@ export function TraceDetailPanel({
         </div>
 
         {/* -------------------------------------------------------------- */}
-        {/* Section 3: Main content tabs — I/O | Diffs | Terminal           */}
+        {/* Section 3: Cost & Tokens (only when data present)              */}
+        {/* -------------------------------------------------------------- */}
+        {hasCostTokenData && (
+          <div>
+            <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-2">
+              Cost &amp; Tokens
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              <TimingTile label="Model" value={model ?? '--'} />
+              <TimingTile
+                label="Cost"
+                value={cost_usd !== undefined ? `$${cost_usd.toFixed(4)}` : '--'}
+              />
+              <TimingTile
+                label="Input Tokens"
+                value={token_count_in !== undefined ? token_count_in.toLocaleString() : '--'}
+              />
+              <TimingTile
+                label="Output Tokens"
+                value={token_count_out !== undefined ? token_count_out.toLocaleString() : '--'}
+              />
+            </div>
+            {showRates && (
+              <p className="text-[10px] text-zinc-500 mt-1.5">
+                Input: ${rateIn!.toFixed(2)}/1K tokens&nbsp;|&nbsp;Output: ${rateOut!.toFixed(2)}/1K tokens
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* -------------------------------------------------------------- */}
+        {/* Section 4: Main content tabs — I/O | Diffs | Terminal           */}
         {/* -------------------------------------------------------------- */}
         <Tabs defaultValue={isError ? 'terminal' : 'io'}>
           <TabsList className="w-full">
