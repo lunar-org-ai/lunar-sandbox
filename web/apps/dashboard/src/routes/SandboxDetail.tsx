@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router'
 import { formatDistanceToNow } from 'date-fns'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Terminal as TerminalIcon } from 'lucide-react'
+import type { PanelImperativeHandle } from 'react-resizable-panels'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -12,6 +13,12 @@ import {
 } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/StatusBadge'
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from '@/components/ui/resizable'
+import { SandboxTerminal } from '@/components/SandboxTerminal'
 import { useEventStream } from '@/hooks/useEventStream'
 import { fetchSandbox, stopSandbox, type SandboxInfo } from '@/lib/api'
 
@@ -28,6 +35,12 @@ export default function SandboxDetail() {
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [stopping, setStopping] = useState(false)
   const [stopError, setStopError] = useState<string | null>(null)
+
+  // Terminal drawer state
+  const [terminalOpen, setTerminalOpen] = useState(false)
+  // Once opened, keep mounted so the session persists when collapsed
+  const terminalMountedRef = useRef(false)
+  const terminalPanelRef = useRef<PanelImperativeHandle | null>(null)
 
   // Initial REST fetch
   useEffect(() => {
@@ -83,6 +96,21 @@ export default function SandboxDetail() {
     }
   }
 
+  function handleToggleTerminal() {
+    const opening = !terminalOpen
+    setTerminalOpen(opening)
+    if (opening) {
+      terminalMountedRef.current = true
+      // Expand the panel when opening
+      setTimeout(() => {
+        terminalPanelRef.current?.expand()
+      }, 0)
+    } else {
+      // Collapse but keep mounted so session persists
+      terminalPanelRef.current?.collapse()
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -124,7 +152,7 @@ export default function SandboxDetail() {
     ? formatDistanceToNow(new Date(sandbox.started_at * 1000), { addSuffix: true })
     : '--'
 
-  return (
+  const mainContent = (
     <div className="max-w-3xl mx-auto p-8 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -192,8 +220,8 @@ export default function SandboxDetail() {
       </Card>
 
       {/* Actions */}
-      {sandbox.state === 'Running' && (
-        <div className="space-y-2">
+      <div className="flex items-center gap-3">
+        {sandbox.state === 'Running' && (
           <Button
             variant="destructive"
             onClick={handleStop}
@@ -201,11 +229,73 @@ export default function SandboxDetail() {
           >
             {stopping ? 'Stopping...' : 'Stop Sandbox'}
           </Button>
-          {stopError && (
-            <p className="text-sm text-red-400">{stopError}</p>
-          )}
-        </div>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleToggleTerminal}
+          className="flex items-center gap-1.5"
+        >
+          <TerminalIcon className="size-4" />
+          {terminalOpen ? 'Hide Terminal' : 'Terminal'}
+        </Button>
+      </div>
+
+      {stopError && (
+        <p className="text-sm text-red-400">{stopError}</p>
       )}
     </div>
+  )
+
+  // Terminal drawer panel (always mounted once opened, hidden when collapsed)
+  const terminalPanel = terminalMountedRef.current ? (
+    <div className={terminalOpen ? 'flex flex-col h-full' : 'hidden'}>
+      {/* Drawer header bar */}
+      <div className="flex items-center justify-between px-4 py-2 border-t border-zinc-800 bg-zinc-900 shrink-0">
+        <div className="flex items-center gap-2 text-xs text-zinc-400 font-mono">
+          <TerminalIcon className="size-3.5" />
+          <span>Terminal — {sandboxId}</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 w-6 p-0 text-zinc-500 hover:text-zinc-200"
+          onClick={handleToggleTerminal}
+          aria-label="Close terminal"
+        >
+          ×
+        </Button>
+      </div>
+      {/* xterm.js terminal */}
+      <div className="flex-1 min-h-0 bg-[#09090b]">
+        <SandboxTerminal sandboxId={sandboxId} sandboxStatus={sandbox.state} />
+      </div>
+    </div>
+  ) : null
+
+  return (
+    <ResizablePanelGroup orientation="vertical" className="h-screen">
+      {/* Top panel: sandbox detail content */}
+      <ResizablePanel defaultSize={terminalOpen ? 55 : 100} minSize={30} className="overflow-y-auto">
+        {mainContent}
+      </ResizablePanel>
+
+      {/* Handle only visible when terminal is open */}
+      {terminalOpen && <ResizableHandle withHandle />}
+
+      {/* Bottom panel: terminal drawer */}
+      {terminalMountedRef.current && (
+        <ResizablePanel
+          panelRef={terminalPanelRef}
+          defaultSize={terminalOpen ? 45 : 0}
+          minSize={0}
+          collapsible
+          collapsedSize={0}
+          className="min-h-0"
+        >
+          {terminalPanel}
+        </ResizablePanel>
+      )}
+    </ResizablePanelGroup>
   )
 }
