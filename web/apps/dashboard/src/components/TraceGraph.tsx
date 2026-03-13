@@ -92,11 +92,12 @@ function TraceGraphInner({ spans, isLive, onSpanSelect, selectedSpanId }: TraceG
             status: span.status,
             durationMs: span.durationMs,
             isActive: isLive && span.id === activeSpanId,
+            isSelected: span.id === selectedSpanId,
           },
         }
       }),
     )
-  }, [spans, isLive, activeSpanId, setNodes])
+  }, [spans, isLive, activeSpanId, selectedSpanId, setNodes])
 
   // --- Auto-pan to active node during live mode ---
   useEffect(() => {

@@ -24,6 +24,7 @@ export type ActionNodeData = {
   status: TraceSpan['status']
   durationMs: number
   isActive: boolean
+  isSelected: boolean
   stepIdx: number
 }
 
@@ -107,6 +108,7 @@ export function spansToGraphElements(
       status: span.status,
       durationMs: span.durationMs,
       isActive: span.id === activeSpanId,
+      isSelected: false,
       stepIdx: span.stepIdx,
     } satisfies ActionNodeData,
   }))

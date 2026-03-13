@@ -49,7 +49,7 @@ function getActionIcon(action: string): React.ElementType {
 type ActionNodeType = Node<ActionNodeData, 'action'>
 
 export function ActionNode({ data }: NodeProps<ActionNodeType>) {
-  const { action, status, durationMs, isActive } = data
+  const { action, status, durationMs, isActive, isSelected } = data
   const ActionIcon = getActionIcon(action)
   const color = getActionColor(action)
 
@@ -99,6 +99,7 @@ export function ActionNode({ data }: NodeProps<ActionNodeType>) {
           'bg-zinc-900 border rounded-lg px-3 py-2 min-w-[200px] select-none',
           borderClass,
           cardOpacity,
+          isSelected && 'ring-2 ring-blue-500/50',
         )}
         style={{ width: 220 }}
       >
