@@ -5,6 +5,8 @@ import { ConnectionStatus } from '@/components/ConnectionStatus'
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import Home from '@/routes/Home'
 import Launcher from '@/routes/Launcher'
+import Runs from '@/routes/Runs'
+import RunDetail from '@/routes/RunDetail'
 import SandboxDetail from '@/routes/SandboxDetail'
 
 function App() {
@@ -24,24 +26,14 @@ function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/launcher" element={<Launcher />} />
-              <Route path="/runs" element={<PlaceholderPage title="Runs" />} />
-              <Route path="/runs/:id" element={<PlaceholderPage title="Run Detail" />} />
+              <Route path="/runs" element={<Runs />} />
+              <Route path="/runs/:id" element={<RunDetail />} />
               <Route path="/sandboxes/:id" element={<SandboxDetail />} />
             </Routes>
           </main>
         </div>
       </SidebarProvider>
     </BrowserRouter>
-  )
-}
-
-// Temporary placeholder for routes not yet implemented
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold">{title}</h1>
-      <p className="text-neutral-400 mt-2">Coming soon...</p>
-    </div>
   )
 }
 
