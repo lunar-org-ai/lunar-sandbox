@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 import { format } from 'date-fns'
 import { ArrowLeft, GitBranch, LayoutGrid, List, RotateCcw } from 'lucide-react'
 import type { PanelImperativeHandle } from 'react-resizable-panels'
+import { useHotkeys } from 'react-hotkeys-hook'
 
 import {
   Card,
@@ -196,8 +197,29 @@ function RunDetailContent({
     episodeStartTs: episode.started_at,
   })
 
-  // --- View mode state ---
-  const [viewMode, setViewMode] = useState<ViewMode>('timeline')
+  // --- View mode state (synced with ?view= search param) ---
+  const [searchParams, setSearchParams] = useSearchParams()
+  const viewParam = searchParams.get('view')
+  const initialViewMode: ViewMode =
+    viewParam === 'graph' || viewParam === 'split' ? viewParam : 'timeline'
+  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode)
+
+  const setViewModeAndParam = (mode: ViewMode) => {
+    setViewMode(mode)
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('view', mode)
+        return next
+      },
+      { replace: true },
+    )
+  }
+
+  // 1/2/3 hotkeys for view switching
+  useHotkeys('1', () => setViewModeAndParam('timeline'), { enableOnFormTags: false })
+  useHotkeys('2', () => setViewModeAndParam('graph'), { enableOnFormTags: false })
+  useHotkeys('3', () => setViewModeAndParam('split'), { enableOnFormTags: false })
 
   // --- Derive card title from view mode ---
   const cardTitle =
@@ -294,8 +316,8 @@ function RunDetailContent({
             <div className="flex gap-1 bg-zinc-800 rounded-md p-0.5">
               <button
                 type="button"
-                title="Timeline"
-                onClick={() => setViewMode('timeline')}
+                title="Timeline (1)"
+                onClick={() => setViewModeAndParam('timeline')}
                 className={`px-2 py-1 rounded text-xs transition-colors ${
                   viewMode === 'timeline'
                     ? 'bg-zinc-700 text-zinc-200'
@@ -306,8 +328,8 @@ function RunDetailContent({
               </button>
               <button
                 type="button"
-                title="Graph"
-                onClick={() => setViewMode('graph')}
+                title="Graph (2)"
+                onClick={() => setViewModeAndParam('graph')}
                 className={`px-2 py-1 rounded text-xs transition-colors ${
                   viewMode === 'graph'
                     ? 'bg-zinc-700 text-zinc-200'
@@ -318,8 +340,8 @@ function RunDetailContent({
               </button>
               <button
                 type="button"
-                title="Split view"
-                onClick={() => setViewMode('split')}
+                title="Split view (3)"
+                onClick={() => setViewModeAndParam('split')}
                 className={`px-2 py-1 rounded text-xs transition-colors ${
                   viewMode === 'split'
                     ? 'bg-zinc-700 text-zinc-200'
