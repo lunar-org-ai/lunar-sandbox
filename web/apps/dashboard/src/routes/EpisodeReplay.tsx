@@ -9,6 +9,7 @@ import {
   SkipBack,
   SkipForward,
 } from 'lucide-react'
+import { useHotkeys } from 'react-hotkeys-hook'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DiffViewer, type FileDiffEntry } from '@/components/DiffViewer'
@@ -498,35 +499,93 @@ export default function EpisodeReplay() {
   }, [playing, speed, spans.length])
 
   // ---------------------------------------------------------------------------
-  // Keyboard shortcuts
+  // Keyboard shortcuts (react-hotkeys-hook — not fired in form inputs/terminal)
   // ---------------------------------------------------------------------------
 
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      // Ignore if focus is in an input/textarea
-      const tag = (e.target as HTMLElement).tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+  const hotkeyOpts = {
+    enableOnFormTags: false,
+    ignoreEventWhen: (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      return (
+        target.classList.contains('xterm-helper-textarea') ||
+        !!target.closest('.xterm')
+      )
+    },
+  } as const
 
-      switch (e.key) {
-        case 'ArrowLeft':
-          e.preventDefault()
-          setPlaying(false)
-          setCurrentStep((prev) => Math.max(0, prev - 1))
-          break
-        case 'ArrowRight':
-          e.preventDefault()
-          setPlaying(false)
-          setCurrentStep((prev) => Math.min(spans.length - 1, prev + 1))
-          break
-        case ' ':
-          e.preventDefault()
-          setPlaying((prev) => !prev)
-          break
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [spans.length])
+  useHotkeys(
+    'arrowleft',
+    (e) => {
+      e.preventDefault()
+      setPlaying(false)
+      setCurrentStep((prev) => Math.max(0, prev - 1))
+    },
+    hotkeyOpts,
+    [spans.length],
+  )
+
+  useHotkeys(
+    'arrowright',
+    (e) => {
+      e.preventDefault()
+      setPlaying(false)
+      setCurrentStep((prev) => Math.min(spans.length - 1, prev + 1))
+    },
+    hotkeyOpts,
+    [spans.length],
+  )
+
+  useHotkeys(
+    'j',
+    (e) => {
+      e.preventDefault()
+      setPlaying(false)
+      setCurrentStep((prev) => Math.min(spans.length - 1, prev + 1))
+    },
+    hotkeyOpts,
+    [spans.length],
+  )
+
+  useHotkeys(
+    'k',
+    (e) => {
+      e.preventDefault()
+      setPlaying(false)
+      setCurrentStep((prev) => Math.max(0, prev - 1))
+    },
+    hotkeyOpts,
+    [spans.length],
+  )
+
+  useHotkeys(
+    'space',
+    (e) => {
+      e.preventDefault()
+      setPlaying((prev) => !prev)
+    },
+    hotkeyOpts,
+  )
+
+  useHotkeys(
+    'home',
+    (e) => {
+      e.preventDefault()
+      setPlaying(false)
+      setCurrentStep(0)
+    },
+    hotkeyOpts,
+  )
+
+  useHotkeys(
+    'end',
+    (e) => {
+      e.preventDefault()
+      setPlaying(false)
+      setCurrentStep(spans.length - 1)
+    },
+    hotkeyOpts,
+    [spans.length],
+  )
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -619,7 +678,7 @@ export default function EpisodeReplay() {
         )}
 
         <span className="ml-auto text-[10px] text-zinc-600 font-mono hidden md:block">
-          Space: play/pause &nbsp;|&nbsp; &larr;&rarr;: step
+          Space: play/pause &nbsp;|&nbsp; &larr;&rarr; / j k: step &nbsp;|&nbsp; Home/End: first/last
         </span>
       </div>
 
