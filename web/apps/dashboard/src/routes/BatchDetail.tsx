@@ -6,6 +6,7 @@ import { BatchProgressBar } from '@/components/BatchProgressBar'
 import { BatchEtaStats } from '@/components/BatchEtaStats'
 import { BatchTaskList } from '@/components/BatchTaskList'
 import { CostChart, type CostDataPoint } from '@/components/CostChart'
+import { ExportButton } from '@/components/ExportButton'
 import { MetricsGrid } from '@/components/MetricsGrid'
 import { useBatchProgress } from '@/hooks/useBatchProgress'
 import { useMetricsStream } from '@/hooks/useMetricsStream'
@@ -109,14 +110,21 @@ export default function BatchDetail() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Breadcrumb */}
-      <nav className="text-sm text-zinc-500">
-        <Link to="/runs" className="hover:text-zinc-300 transition-colors">
-          Batches
-        </Link>
-        <span className="mx-1">/</span>
-        <span className="text-zinc-200 font-mono">{batch.batch_id}</span>
-      </nav>
+      {/* Breadcrumb + export */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <nav className="text-sm text-zinc-500">
+          <Link to="/runs" className="hover:text-zinc-300 transition-colors">
+            Batches
+          </Link>
+          <span className="mx-1">/</span>
+          <span className="text-zinc-200 font-mono">{batch.batch_id}</span>
+        </nav>
+        <ExportButton
+          data={batch}
+          filename={`batch-${id ?? batch.batch_id}`}
+          csvRows={batch.task_results.map((tr) => tr as Record<string, unknown>)}
+        />
+      </div>
 
       {/* Header section: progress bar + ETA + live cost */}
       <div className="space-y-4">

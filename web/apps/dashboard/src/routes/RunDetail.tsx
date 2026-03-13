@@ -16,12 +16,14 @@ import {
   ResizablePanelGroup,
 } from '@/components/ui/resizable'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ExportButton } from '@/components/ExportButton'
 import { StatusBadge } from '@/components/StatusBadge'
 import { TraceDetailPanel } from '@/components/TraceDetailPanel'
 import { TraceGraph } from '@/components/TraceGraph'
 import { TraceTimeline } from '@/components/TraceTimeline'
 import { useTraceStream } from '@/hooks/useTraceStream'
 import { fetchEpisode, type EpisodeDetail } from '@/lib/api'
+import { flattenEpisodeForCsv } from '@/lib/export-utils'
 import { type TraceSpan } from '@/lib/trace-utils'
 
 // ---------------------------------------------------------------------------
@@ -223,10 +225,17 @@ function RunDetailContent({
       {/* Outcome Summary Card */}
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-3 flex-wrap">
-            <StatusBadge status={episode.outcome} type="outcome" />
-            <span className="font-mono text-sm text-neutral-300 break-all">{episode.episode_id}</span>
-            <span className="text-sm text-neutral-400">{episode.task_name}</span>
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
+              <StatusBadge status={episode.outcome} type="outcome" />
+              <span className="font-mono text-sm text-neutral-300 break-all">{episode.episode_id}</span>
+              <span className="text-sm text-neutral-400">{episode.task_name}</span>
+            </div>
+            <ExportButton
+              data={episode}
+              filename={`episode-${episodeId}`}
+              csvRows={[flattenEpisodeForCsv(episode as Record<string, unknown>)]}
+            />
           </div>
         </CardHeader>
         <CardContent>
