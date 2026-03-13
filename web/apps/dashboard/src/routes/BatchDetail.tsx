@@ -5,7 +5,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { BatchProgressBar } from '@/components/BatchProgressBar'
 import { BatchEtaStats } from '@/components/BatchEtaStats'
 import { BatchTaskList } from '@/components/BatchTaskList'
+import { CostChart, type CostDataPoint } from '@/components/CostChart'
+import { MetricsGrid } from '@/components/MetricsGrid'
 import { useBatchProgress } from '@/hooks/useBatchProgress'
+import { useMetricsStream } from '@/hooks/useMetricsStream'
 
 // ---------------------------------------------------------------------------
 // BatchDetail page
@@ -15,6 +18,9 @@ export default function BatchDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { batch, loading, error, liveCost } = useBatchProgress(id ?? null)
+
+  // Metrics tab: WS telemetry stream (hardcoded topic for Phase 13)
+  const { metrics } = useMetricsStream('telemetry:mock-run-1')
 
   // ---------------------------------------------------------------------------
   // Loading state
@@ -64,6 +70,27 @@ export default function BatchDetail() {
     displayCost > 0 ? `$${displayCost.toFixed(4)}` : '--'
 
   const isComplete = completed >= batch.total_tasks && batch.total_tasks > 0
+
+  // Cost tab: derive cumulative cost chart data from task_results
+  let runningCost = 0
+  const costData: CostDataPoint[] = batch.task_results
+    .filter((t) => t.wall_clock_ms > 0)
+    .sort((a, b) => a.wall_clock_ms - b.wall_clock_ms)
+    .map((t) => {
+      runningCost += t.estimated_cost
+      return {
+        elapsed_s: t.wall_clock_ms / 1000,
+        cumulative_usd: runningCost,
+      }
+    })
+
+  // Token breakdown: token_count is total; split 60/40 input/output as estimate
+  const totalTokens = batch.task_results.reduce((sum, t) => sum + t.token_count, 0)
+  const totalInputTokens = Math.round(totalTokens * 0.6)
+  const totalOutputTokens = totalTokens - totalInputTokens
+
+  // Use WS live cost for totalCost prop if available
+  const chartTotalCost = liveCost !== null ? liveCost : batch.total_cost
 
   // Worst-performing tasks by error count
   const taskErrorCounts = batch.task_results.reduce<Map<string, number>>((acc, t) => {
@@ -175,15 +202,16 @@ export default function BatchDetail() {
         </TabsContent>
 
         <TabsContent value="metrics" className="mt-4">
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6 text-center">
-            <p className="text-sm text-zinc-500">Metrics coming soon</p>
-          </div>
+          <MetricsGrid metrics={metrics} />
         </TabsContent>
 
         <TabsContent value="cost" className="mt-4">
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6 text-center">
-            <p className="text-sm text-zinc-500">Cost tracking coming soon</p>
-          </div>
+          <CostChart
+            data={costData}
+            inputTokens={totalInputTokens}
+            outputTokens={totalOutputTokens}
+            totalCost={chartTotalCost}
+          />
         </TabsContent>
       </Tabs>
     </div>
