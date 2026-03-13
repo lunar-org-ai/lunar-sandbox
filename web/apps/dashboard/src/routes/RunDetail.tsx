@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useParams } from 'react-router'
 import { format } from 'date-fns'
 import { ArrowLeft } from 'lucide-react'
+import type { PanelImperativeHandle } from 'react-resizable-panels'
 
 import {
   Card,
@@ -9,9 +10,18 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '@/components/ui/resizable'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/StatusBadge'
+import { TraceDetailPanel } from '@/components/TraceDetailPanel'
+import { TraceTimeline } from '@/components/TraceTimeline'
+import { useTraceStream } from '@/hooks/useTraceStream'
 import { fetchEpisode, type EpisodeDetail } from '@/lib/api'
+import { type TraceSpan } from '@/lib/trace-utils'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -36,28 +46,6 @@ function formatDatetime(ts: number | null | undefined): string {
   return format(new Date(ts * 1000), 'MMM d, yyyy HH:mm:ss')
 }
 
-// Mini timeline color palette keyed by action_type or index
-const SEGMENT_COLORS = [
-  'bg-blue-500',
-  'bg-violet-500',
-  'bg-emerald-500',
-  'bg-amber-500',
-  'bg-rose-500',
-  'bg-cyan-500',
-  'bg-pink-500',
-  'bg-indigo-500',
-]
-
-function getSegmentColor(actionType: string | undefined, index: number): string {
-  if (!actionType) return SEGMENT_COLORS[index % SEGMENT_COLORS.length]
-  // Simple deterministic hash from action_type string
-  let hash = 0
-  for (let i = 0; i < actionType.length; i++) {
-    hash = (hash + actionType.charCodeAt(i)) % SEGMENT_COLORS.length
-  }
-  return SEGMENT_COLORS[hash]
-}
-
 // ---------------------------------------------------------------------------
 // Metric tile
 // ---------------------------------------------------------------------------
@@ -77,51 +65,6 @@ function Metric({ label, value }: MetricProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Mini Timeline Preview
-// ---------------------------------------------------------------------------
-
-interface Step {
-  duration_ms?: number
-  action_type?: string
-  [key: string]: unknown
-}
-
-interface MiniTimelineProps {
-  steps: Step[]
-}
-
-function MiniTimeline({ steps }: MiniTimelineProps) {
-  if (steps.length === 0) {
-    return (
-      <p className="text-sm text-neutral-400">No steps recorded.</p>
-    )
-  }
-
-  const totalDuration = steps.reduce((sum, s) => sum + (s.duration_ms ?? 0), 0)
-
-  return (
-    <div className="space-y-3">
-      <div className="flex h-8 rounded overflow-hidden border border-neutral-800">
-        {steps.map((step, i) => {
-          const dur = step.duration_ms ?? 0
-          const widthPct = totalDuration > 0 ? (dur / totalDuration) * 100 : 100 / steps.length
-          const color = getSegmentColor(step.action_type, i)
-          return (
-            <div
-              key={i}
-              className={`${color} opacity-80 hover:opacity-100 transition-opacity`}
-              style={{ width: `${widthPct}%` }}
-              title={`Step ${i + 1}${step.action_type ? ` (${step.action_type})` : ''}: ${formatDuration(dur)}`}
-            />
-          )
-        })}
-      </div>
-      <p className="text-xs text-neutral-500">{steps.length} step{steps.length !== 1 ? 's' : ''}</p>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // RunDetail page
 // ---------------------------------------------------------------------------
 
@@ -132,6 +75,12 @@ export default function RunDetail() {
   const [episode, setEpisode] = useState<EpisodeDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
+
+  // Selected span state
+  const [selectedSpan, setSelectedSpan] = useState<TraceSpan | null>(null)
+
+  // Ref for the detail panel (for programmatic collapse/expand)
+  const detailPanelRef = useRef<PanelImperativeHandle | null>(null)
 
   useEffect(() => {
     if (!episodeId) return
@@ -147,23 +96,45 @@ export default function RunDetail() {
       })
   }, [episodeId])
 
+  // Escape key closes the detail panel
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setSelectedSpan(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  // Collapse/expand detail panel based on selectedSpan
+  useEffect(() => {
+    const panel = detailPanelRef.current
+    if (!panel) return
+    if (selectedSpan) {
+      panel.expand()
+    } else {
+      panel.collapse()
+    }
+  }, [selectedSpan])
+
   // ---------------------------------------------------------------------------
   // Loading state
   // ---------------------------------------------------------------------------
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto p-8 space-y-4">
+      <div className="max-w-6xl mx-auto p-8 space-y-4">
         <Skeleton className="h-6 w-24" />
         <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-96 w-full" />
       </div>
     )
   }
 
   if (fetchError) {
     return (
-      <div className="max-w-4xl mx-auto p-8 space-y-4">
+      <div className="max-w-6xl mx-auto p-8 space-y-4">
         <Link
           to="/runs"
           className="inline-flex items-center gap-1 text-sm text-neutral-400 hover:text-neutral-200"
@@ -178,14 +149,46 @@ export default function RunDetail() {
 
   if (!episode) return null
 
-  const steps = episode.steps as Step[]
+  return (
+    <RunDetailContent
+      episode={episode}
+      episodeId={episodeId}
+      selectedSpan={selectedSpan}
+      setSelectedSpan={setSelectedSpan}
+      detailPanelRef={detailPanelRef}
+    />
+  )
+}
 
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// RunDetailContent — separated so hooks always run in the same component
+// ---------------------------------------------------------------------------
+
+interface RunDetailContentProps {
+  episode: EpisodeDetail
+  episodeId: string
+  selectedSpan: TraceSpan | null
+  setSelectedSpan: (span: TraceSpan | null) => void
+  detailPanelRef: React.RefObject<PanelImperativeHandle | null>
+}
+
+function RunDetailContent({
+  episode,
+  episodeId,
+  selectedSpan,
+  setSelectedSpan,
+  detailPanelRef,
+}: RunDetailContentProps) {
+  // --- useTraceStream integration ---
+  const { spans, isLive, totalSpans } = useTraceStream({
+    episodeId,
+    sandboxId: episode.sandbox_id || null,
+    initialSteps: episode.steps as Record<string, unknown>[],
+    episodeStartTs: episode.started_at,
+  })
 
   return (
-    <div className="max-w-4xl mx-auto p-8 space-y-6">
+    <div className="max-w-6xl mx-auto p-8 space-y-6">
       {/* Breadcrumb / back navigation */}
       <div className="flex items-center gap-2 text-sm text-neutral-400">
         <Link
@@ -244,14 +247,49 @@ export default function RunDetail() {
         </CardContent>
       </Card>
 
-      {/* Mini Timeline Preview */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Timeline Preview</CardTitle>
+      {/* Trace Timeline + Detail Panel */}
+      <Card className="overflow-hidden rounded-lg border border-zinc-800 p-0">
+        <CardHeader className="border-b border-zinc-800 px-4 py-3">
+          <CardTitle className="text-sm font-medium text-zinc-300">Trace Timeline</CardTitle>
         </CardHeader>
-        <CardContent>
-          <MiniTimeline steps={steps} />
-        </CardContent>
+        <div
+          className="overflow-hidden"
+          style={{ height: 'calc(100vh - 420px)', minHeight: 360 }}
+        >
+          <ResizablePanelGroup orientation="horizontal" className="h-full">
+            {/* Left panel: Timeline */}
+            <ResizablePanel defaultSize={selectedSpan ? 65 : 100} minSize={40}>
+              <TraceTimeline
+                spans={spans}
+                isLive={isLive}
+                totalSpans={totalSpans}
+                onSpanSelect={setSelectedSpan}
+                selectedSpanId={selectedSpan?.id ?? null}
+              />
+            </ResizablePanel>
+
+            {/* Handle only visible when detail panel open */}
+            {selectedSpan && <ResizableHandle withHandle />}
+
+            {/* Right panel: Detail panel */}
+            <ResizablePanel
+              defaultSize={35}
+              minSize={20}
+              collapsible
+              collapsedSize={0}
+              panelRef={detailPanelRef}
+            >
+              {selectedSpan && (
+                <TraceDetailPanel
+                  span={selectedSpan}
+                  episodeStartTs={episode.started_at}
+                  parentDurationMs={episode.duration_ms > 0 ? episode.duration_ms : undefined}
+                  onClose={() => setSelectedSpan(null)}
+                />
+              )}
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
       </Card>
     </div>
   )
