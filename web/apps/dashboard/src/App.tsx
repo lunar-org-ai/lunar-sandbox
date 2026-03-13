@@ -4,6 +4,8 @@ import { AppSidebar } from '@/components/AppSidebar'
 import { ConnectionStatus } from '@/components/ConnectionStatus'
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import Home from '@/routes/Home'
+import Launcher from '@/routes/Launcher'
+import SandboxDetail from '@/routes/SandboxDetail'
 
 function App() {
   return (
@@ -21,10 +23,10 @@ function App() {
           <main className="flex-1 bg-neutral-950 text-neutral-50">
             <Routes>
               <Route path="/" element={<Home />} />
-              <Route path="/launcher" element={<PlaceholderPage title="Launcher" />} />
+              <Route path="/launcher" element={<Launcher />} />
               <Route path="/runs" element={<PlaceholderPage title="Runs" />} />
               <Route path="/runs/:id" element={<PlaceholderPage title="Run Detail" />} />
-              <Route path="/sandboxes/:id" element={<PlaceholderPage title="Sandbox Detail" />} />
+              <Route path="/sandboxes/:id" element={<SandboxDetail />} />
             </Routes>
           </main>
         </div>
