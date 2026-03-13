@@ -23,7 +23,7 @@ export function useSandboxUpdates() {
 
   // Merge WS sandbox_status events into state
   useEffect(() => {
-    const latest = events.at(-1)
+    const latest = events[events.length - 1]
     if (!latest || latest.type !== 'sandbox_status') return
 
     const payload = latest.payload as {

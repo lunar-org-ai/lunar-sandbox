@@ -1,54 +1,33 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router'
+
+import { StatusBadge } from '@/components/StatusBadge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
-  fetchHealth,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { useSandboxUpdates } from '@/hooks/useSandboxUpdates'
+import {
   fetchEpisodes,
-  fetchSandboxes,
-  fetchTasks,
-  fetchTelemetryRuns,
+  fetchHealth,
+  stopSandbox,
+  type EpisodeSummary,
+  type HealthResponse,
 } from '@/lib/api'
-import type {
-  HealthResponse,
-  PaginatedEpisodes,
-  PoolStatus,
-  PaginatedTasks,
-  PaginatedTelemetryRuns,
-} from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 // ---------------------------------------------------------------------------
-// Small helpers
+// Status summary cards
 // ---------------------------------------------------------------------------
 
-function StatusBadge({ status }: { status: string }) {
-  const bg =
-    status === 'ok'
-      ? 'bg-green-600'
-      : status === 'degraded'
-        ? 'bg-yellow-600'
-        : 'bg-red-600'
-  return (
-    <span className={`${bg} text-white text-xs font-medium px-2 py-0.5 rounded`}>
-      {status}
-    </span>
-  )
-}
-
-function SectionError({ message }: { message: string }) {
-  return <p className="text-red-400 text-sm">{message}</p>
-}
-
-function SectionLoading() {
-  return <p className="text-neutral-500 text-sm">Loading...</p>
-}
-
-function SectionEmpty({ label }: { label: string }) {
-  return <p className="text-neutral-500 text-sm">No {label} recorded yet.</p>
-}
-
-// ---------------------------------------------------------------------------
-// Section components
-// ---------------------------------------------------------------------------
-
-function HealthSection() {
+function EngineStatusCard() {
   const [data, setData] = useState<HealthResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -58,175 +37,262 @@ function HealthSection() {
       .catch((e: Error) => setError(e.message))
   }, [])
 
-  if (error) return <SectionError message={error} />
-  if (!data) return <SectionLoading />
-
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-neutral-300">Status:</span>
-        <StatusBadge status={data.status} />
-      </div>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-        <dt className="text-neutral-400">Engine started</dt>
-        <dd>{data.engine_started ? 'Yes' : 'No'}</dd>
-        <dt className="text-neutral-400">Stores available</dt>
-        <dd>{data.stores_available ? 'Yes' : 'No'}</dd>
-      </dl>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Engine Status</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {error ? (
+          <p className="text-destructive text-sm">{error}</p>
+        ) : !data ? (
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Health:</span>
+              <StatusBadge status={data.status} type="sandbox" />
+            </div>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              <dt className="text-muted-foreground">Engine started</dt>
+              <dd>{data.engine_started ? 'Yes' : 'No'}</dd>
+              <dt className="text-muted-foreground">Stores available</dt>
+              <dd>{data.stores_available ? 'Yes' : 'No'}</dd>
+            </dl>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
-function SandboxesSection() {
-  const [data, setData] = useState<PoolStatus | null>(null)
-  const [error, setError] = useState<string | null>(null)
+function SandboxPoolCard() {
+  const { sandboxes, loading, error } = useSandboxUpdates()
 
-  useEffect(() => {
-    fetchSandboxes()
-      .then(setData)
-      .catch((e: Error) => setError(e.message))
-  }, [])
+  const stateCounts = sandboxes.reduce<Record<string, number>>((acc, s) => {
+    acc[s.state] = (acc[s.state] ?? 0) + 1
+    return acc
+  }, {})
 
-  if (error) return <SectionError message={error} />
-  if (!data) return <SectionLoading />
+  const stateEntries = Object.entries(stateCounts)
 
   return (
-    <div className="space-y-2">
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-        <dt className="text-neutral-400">Pool running</dt>
-        <dd>{data.running ? 'Yes' : 'No'}</dd>
-        <dt className="text-neutral-400">Total sandboxes</dt>
-        <dd>{data.total_sandboxes}</dd>
-      </dl>
-      {data.sandboxes.length > 0 && (
-        <table className="w-full text-sm mt-2">
-          <thead>
-            <tr className="text-left text-neutral-400 border-b border-neutral-700">
-              <th className="pb-1">Sandbox ID</th>
-              <th className="pb-1">State</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.sandboxes.map((s) => (
-              <tr key={s.sandbox_id} className="border-b border-neutral-800">
-                <td className="py-1 font-mono text-xs">{s.sandbox_id}</td>
-                <td className="py-1">{s.state}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Sandbox Pool</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {error ? (
+          <p className="text-destructive text-sm">{error}</p>
+        ) : loading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-16" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-2xl font-bold">{sandboxes.length}</p>
+            <p className="text-sm text-muted-foreground">
+              {stateEntries.length > 0
+                ? stateEntries.map(([state, count]) => `${count} ${state}`).join(', ')
+                : 'No sandboxes'}
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
-function EpisodesSection() {
-  const [data, setData] = useState<PaginatedEpisodes | null>(null)
+function RecentEpisodesCard() {
+  const [total, setTotal] = useState<number | null>(null)
+  const [latest, setLatest] = useState<EpisodeSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchEpisodes({ limit: 5 })
-      .then(setData)
+      .then(data => {
+        setTotal(data.total)
+        setLatest(data.items[0] ?? null)
+      })
       .catch((e: Error) => setError(e.message))
   }, [])
 
-  if (error) return <SectionError message={error} />
-  if (!data) return <SectionLoading />
-  if (data.items.length === 0) return <SectionEmpty label="episodes" />
-
   return (
-    <div className="space-y-2">
-      <p className="text-sm text-neutral-400">Total: {data.total}</p>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-neutral-400 border-b border-neutral-700">
-            <th className="pb-1">Episode ID</th>
-            <th className="pb-1">Task</th>
-            <th className="pb-1">Outcome</th>
-            <th className="pb-1">Score</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.items.map((ep) => (
-            <tr key={ep.episode_id} className="border-b border-neutral-800">
-              <td className="py-1 font-mono text-xs">{ep.episode_id}</td>
-              <td className="py-1">{ep.task_name}</td>
-              <td className="py-1">{ep.outcome}</td>
-              <td className="py-1">{ep.score ?? '-'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Recent Episodes</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {error ? (
+          <p className="text-destructive text-sm">{error}</p>
+        ) : total === null ? (
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-16" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-2xl font-bold">{total}</p>
+            {latest ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Latest:</span>
+                <StatusBadge status={latest.outcome} type="outcome" />
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No episodes yet</p>
+            )}
+            <Link to="/runs" className="text-xs text-primary underline-offset-4 hover:underline">
+              View all runs
+            </Link>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
-function TasksSection() {
-  const [data, setData] = useState<PaginatedTasks | null>(null)
-  const [error, setError] = useState<string | null>(null)
+// ---------------------------------------------------------------------------
+// Sandbox monitoring table
+// ---------------------------------------------------------------------------
+
+interface SandboxRowProps {
+  sandbox: {
+    sandbox_id: string
+    state: string
+    cpu_percent?: number | null
+    memory_mb?: number | null
+  }
+  onStop: (id: string) => void
+  stopping: boolean
+}
+
+function SandboxRow({ sandbox, onStop, stopping }: SandboxRowProps) {
+  const prevStateRef = useRef(sandbox.state)
+  const [highlighted, setHighlighted] = useState(false)
 
   useEffect(() => {
-    fetchTasks({ limit: 10 })
-      .then(setData)
-      .catch((e: Error) => setError(e.message))
-  }, [])
-
-  if (error) return <SectionError message={error} />
-  if (!data) return <SectionLoading />
-  if (data.items.length === 0) return <SectionEmpty label="tasks" />
+    if (prevStateRef.current !== sandbox.state) {
+      prevStateRef.current = sandbox.state
+      setHighlighted(true)
+      const timer = setTimeout(() => setHighlighted(false), 800)
+      return () => clearTimeout(timer)
+    }
+  }, [sandbox.state])
 
   return (
-    <div className="space-y-2">
-      <p className="text-sm text-neutral-400">Total: {data.total}</p>
-      <ul className="text-sm space-y-1">
-        {data.items.map((t) => (
-          <li key={t.name} className="font-mono text-xs bg-neutral-800 px-2 py-1 rounded">
-            {t.name}
-          </li>
-        ))}
-      </ul>
-    </div>
+    <TableRow
+      className={cn(
+        'transition-colors duration-700',
+        highlighted && 'bg-yellow-500/10',
+      )}
+    >
+      <TableCell className="font-mono text-xs max-w-[180px] truncate">
+        {sandbox.sandbox_id}
+      </TableCell>
+      <TableCell>
+        <StatusBadge status={sandbox.state} type="sandbox" />
+      </TableCell>
+      <TableCell className="text-right">
+        {sandbox.cpu_percent != null ? `${sandbox.cpu_percent.toFixed(1)}%` : '--'}
+      </TableCell>
+      <TableCell className="text-right">
+        {sandbox.memory_mb != null ? `${sandbox.memory_mb.toFixed(0)} MB` : '--'}
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" asChild>
+            <Link to={`/sandboxes/${sandbox.sandbox_id}`}>View</Link>
+          </Button>
+          {sandbox.state === 'Running' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              disabled={stopping}
+              onClick={() => onStop(sandbox.sandbox_id)}
+            >
+              Stop
+            </Button>
+          )}
+        </div>
+      </TableCell>
+    </TableRow>
   )
 }
 
-function TelemetrySection() {
-  const [data, setData] = useState<PaginatedTelemetryRuns | null>(null)
-  const [error, setError] = useState<string | null>(null)
+function SandboxTable() {
+  const { sandboxes, loading, error } = useSandboxUpdates()
+  const [stoppingIds, setStoppingIds] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    fetchTelemetryRuns({ limit: 5 })
-      .then(setData)
-      .catch((e: Error) => setError(e.message))
-  }, [])
+  async function handleStop(sandboxId: string) {
+    setStoppingIds(prev => new Set(prev).add(sandboxId))
+    try {
+      await stopSandbox(sandboxId)
+    } finally {
+      setStoppingIds(prev => {
+        const next = new Set(prev)
+        next.delete(sandboxId)
+        return next
+      })
+    }
+  }
 
-  if (error) return <SectionError message={error} />
-  if (!data) return <SectionLoading />
-  if (data.items.length === 0) return <SectionEmpty label="telemetry runs" />
+  if (error) {
+    return (
+      <p className="text-destructive text-sm p-4">{error}</p>
+    )
+  }
+
+  if (!loading && sandboxes.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <p className="text-muted-foreground text-sm">
+          No sandboxes running. Launch an experiment to get started.
+        </p>
+        <Button asChild variant="outline" size="sm">
+          <Link to="/launcher">Go to Launcher</Link>
+        </Button>
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-2">
-      <p className="text-sm text-neutral-400">Total: {data.total}</p>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-neutral-400 border-b border-neutral-700">
-            <th className="pb-1">Run ID</th>
-            <th className="pb-1">Started At</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.items.map((run) => (
-            <tr key={run.run_id} className="border-b border-neutral-800">
-              <td className="py-1 font-mono text-xs">{run.run_id}</td>
-              <td className="py-1">
-                {run.started_at
-                  ? new Date(run.started_at * 1000).toLocaleString()
-                  : '-'}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Sandbox ID</TableHead>
+          <TableHead>State</TableHead>
+          <TableHead className="text-right">CPU %</TableHead>
+          <TableHead className="text-right">Memory</TableHead>
+          <TableHead>Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {loading
+          ? Array.from({ length: 3 }).map((_, i) => (
+              <TableRow key={i}>
+                <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+              </TableRow>
+            ))
+          : sandboxes.map(sandbox => (
+              <SandboxRow
+                key={sandbox.sandbox_id}
+                sandbox={sandbox}
+                onStop={handleStop}
+                stopping={stoppingIds.has(sandbox.sandbox_id)}
+              />
+            ))}
+      </TableBody>
+    </Table>
   )
 }
 
@@ -236,39 +302,20 @@ function TelemetrySection() {
 
 export default function Home() {
   return (
-    <div className="max-w-4xl mx-auto p-8">
-      <h1 className="text-3xl font-bold tracking-tight mb-8">Lunar Sandbox Dashboard</h1>
+    <div className="p-6 space-y-6">
+      <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
 
-      <div className="grid grid-cols-1 gap-6">
-        {/* Health */}
-        <section className="bg-neutral-900 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">API Health</h2>
-          <HealthSection />
-        </section>
+      {/* Status summary cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <EngineStatusCard />
+        <SandboxPoolCard />
+        <RecentEpisodesCard />
+      </div>
 
-        {/* Sandboxes */}
-        <section className="bg-neutral-900 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Sandbox Pool</h2>
-          <SandboxesSection />
-        </section>
-
-        {/* Episodes */}
-        <section className="bg-neutral-900 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Recent Episodes</h2>
-          <EpisodesSection />
-        </section>
-
-        {/* Tasks */}
-        <section className="bg-neutral-900 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Tasks</h2>
-          <TasksSection />
-        </section>
-
-        {/* Telemetry */}
-        <section className="bg-neutral-900 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Telemetry Runs</h2>
-          <TelemetrySection />
-        </section>
+      {/* Sandbox monitoring table */}
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold">Sandbox Monitor</h2>
+        <SandboxTable />
       </div>
     </div>
   )
