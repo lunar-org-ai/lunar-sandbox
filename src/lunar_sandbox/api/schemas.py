@@ -14,9 +14,12 @@ from pydantic import BaseModel
 from lunar_sandbox.api.pagination import PaginatedResponse
 
 __all__ = [
+    "BatchDetail",
+    "BatchSummary",
     "EpisodeDetail",
     "EpisodeSummary",
     "HealthResponse",
+    "PaginatedBatches",
     "PaginatedEpisodes",
     "PaginatedTasks",
     "PaginatedTelemetryRuns",
@@ -24,6 +27,7 @@ __all__ = [
     "RunLaunchResponse",
     "RunRequest",
     "SandboxInfo",
+    "TaskResultSummary",
     "TaskSummary",
     "TelemetryRunDetail",
     "TelemetryRunSummary",
@@ -173,6 +177,53 @@ class RunLaunchResponse(BaseModel):
 
     run_id: str
     episode_id: str
+
+
+# ---------------------------------------------------------------------------
+# Batches
+# ---------------------------------------------------------------------------
+
+
+class TaskResultSummary(BaseModel):
+    """Summary of a single task result within a batch."""
+
+    task_name: str
+    episode_id: str = ""
+    outcome: str
+    score: float | None = None
+    wall_clock_ms: float = 0.0
+    step_count: int = 0
+    token_count: int = 0
+    estimated_cost: float = 0.0
+
+
+class BatchSummary(BaseModel):
+    """Summary of a batch evaluation run."""
+
+    batch_id: str
+    benchmark_name: str = ""
+    total_tasks: int = 0
+    passed: int = 0
+    failed: int = 0
+    errors: int = 0
+    pass_rate: float = 0.0
+    total_tokens: int = 0
+    total_cost: float = 0.0
+    duration_ms: float = 0.0
+    started_at: float = 0.0
+    ended_at: float | None = None
+
+
+class BatchDetail(BatchSummary):
+    """Full batch detail including per-task results."""
+
+    task_results: list[TaskResultSummary] = []
+
+
+class PaginatedBatches(PaginatedResponse):
+    """Paginated list of batch summaries."""
+
+    items: list[BatchSummary]
 
 
 # ---------------------------------------------------------------------------
