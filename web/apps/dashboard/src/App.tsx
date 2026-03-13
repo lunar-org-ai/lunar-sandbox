@@ -9,6 +9,8 @@ import Runs from '@/routes/Runs'
 import RunDetail from '@/routes/RunDetail'
 import SandboxDetail from '@/routes/SandboxDetail'
 import BatchDetail from '@/routes/BatchDetail'
+import EpisodeReplay from '@/routes/EpisodeReplay'
+import Export from '@/routes/Export'
 
 function App() {
   return (
@@ -31,6 +33,8 @@ function App() {
               <Route path="/runs/:id" element={<RunDetail />} />
               <Route path="/sandboxes/:id" element={<SandboxDetail />} />
               <Route path="/batches/:id" element={<BatchDetail />} />
+              <Route path="/replay/:id" element={<EpisodeReplay />} />
+              <Route path="/export" element={<Export />} />
             </Routes>
           </main>
         </div>

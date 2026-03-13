@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { format } from 'date-fns'
-import { ArrowLeft, GitBranch, LayoutGrid, List } from 'lucide-react'
+import { ArrowLeft, GitBranch, LayoutGrid, List, RotateCcw } from 'lucide-react'
 import type { PanelImperativeHandle } from 'react-resizable-panels'
 
 import {
@@ -231,11 +231,22 @@ function RunDetailContent({
               <span className="font-mono text-sm text-neutral-300 break-all">{episode.episode_id}</span>
               <span className="text-sm text-neutral-400">{episode.task_name}</span>
             </div>
-            <ExportButton
-              data={episode}
-              filename={`episode-${episodeId}`}
-              csvRows={[flattenEpisodeForCsv(episode as Record<string, unknown>)]}
-            />
+            <div className="flex items-center gap-2">
+              {episode.ended_at != null && (
+                <Link
+                  to={`/replay/${episodeId}`}
+                  className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 border border-zinc-700 transition-colors"
+                >
+                  <RotateCcw className="size-3.5" />
+                  Replay
+                </Link>
+              )}
+              <ExportButton
+                data={episode}
+                filename={`episode-${episodeId}`}
+                csvRows={[flattenEpisodeForCsv(episode as Record<string, unknown>)]}
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -380,12 +391,24 @@ function RunDetailContent({
               panelRef={detailPanelRef}
             >
               {selectedSpan && (
-                <TraceDetailPanel
-                  span={selectedSpan}
-                  episodeStartTs={episode.started_at}
-                  parentDurationMs={episode.duration_ms > 0 ? episode.duration_ms : undefined}
-                  onClose={() => setSelectedSpan(null)}
-                />
+                <div className="flex flex-col h-full overflow-hidden">
+                  <div className="shrink-0 flex items-center justify-end px-3 py-1 bg-zinc-900 border-b border-zinc-800">
+                    <Link
+                      to={`/replay/${episodeId}?step=${selectedSpan.stepIdx}`}
+                      className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                      Open in Replay
+                    </Link>
+                  </div>
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    <TraceDetailPanel
+                      span={selectedSpan}
+                      episodeStartTs={episode.started_at}
+                      parentDurationMs={episode.duration_ms > 0 ? episode.duration_ms : undefined}
+                      onClose={() => setSelectedSpan(null)}
+                    />
+                  </div>
+                </div>
               )}
             </ResizablePanel>
           </ResizablePanelGroup>
