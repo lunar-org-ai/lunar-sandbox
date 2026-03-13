@@ -16,6 +16,10 @@ export type TelemetryRunSummary = components['schemas']['TelemetryRunSummary']
 export type PaginatedTelemetryRuns = components['schemas']['PaginatedTelemetryRuns']
 export type RunRequest = components['schemas']['RunRequest']
 export type RunLaunchResponse = components['schemas']['RunLaunchResponse']
+export type BatchSummary = components['schemas']['BatchSummary']
+export type BatchDetail = components['schemas']['BatchDetail']
+export type TaskResultSummary = components['schemas']['TaskResultSummary']
+export type PaginatedBatches = components['schemas']['PaginatedBatches']
 
 // ---------------------------------------------------------------------------
 // Fetch utilities (hand-written, types-only codegen per locked decision)
@@ -121,6 +125,25 @@ export async function fetchTelemetryRuns(params?: {
   if (params?.limit !== undefined) searchParams.set('limit', String(params.limit))
   const query = searchParams.toString()
   const res = await fetch(`/api/telemetry${query ? `?${query}` : ''}`)
+  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  return res.json()
+}
+
+export async function fetchBatches(params?: {
+  offset?: number
+  limit?: number
+}): Promise<PaginatedBatches> {
+  const searchParams = new URLSearchParams()
+  if (params?.offset !== undefined) searchParams.set('offset', String(params.offset))
+  if (params?.limit !== undefined) searchParams.set('limit', String(params.limit))
+  const query = searchParams.toString()
+  const res = await fetch(`/api/batches${query ? `?${query}` : ''}`)
+  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  return res.json()
+}
+
+export async function fetchBatch(batchId: string): Promise<BatchDetail> {
+  const res = await fetch(`/api/batches/${encodeURIComponent(batchId)}`)
   if (!res.ok) throw new Error(`API error: ${res.status}`)
   return res.json()
 }
