@@ -4,6 +4,46 @@
  */
 
 export interface paths {
+    "/api/batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Batches
+         * @description List batch runs with pagination.
+         */
+        get: operations["list_batches_api_batches_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/batches/{batch_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Batch
+         * @description Get batch detail with per-task results.
+         */
+        get: operations["get_batch_api_batches__batch_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/episodes": {
         parameters: {
             query?: never;
@@ -248,6 +288,131 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * BatchDetail
+         * @description Full batch detail including per-task results.
+         */
+        BatchDetail: {
+            /** Batch Id */
+            batch_id: string;
+            /**
+             * Benchmark Name
+             * @default
+             */
+            benchmark_name: string;
+            /**
+             * Total Tasks
+             * @default 0
+             */
+            total_tasks: number;
+            /**
+             * Passed
+             * @default 0
+             */
+            passed: number;
+            /**
+             * Failed
+             * @default 0
+             */
+            failed: number;
+            /**
+             * Errors
+             * @default 0
+             */
+            errors: number;
+            /**
+             * Pass Rate
+             * @default 0
+             */
+            pass_rate: number;
+            /**
+             * Total Tokens
+             * @default 0
+             */
+            total_tokens: number;
+            /**
+             * Total Cost
+             * @default 0
+             */
+            total_cost: number;
+            /**
+             * Duration Ms
+             * @default 0
+             */
+            duration_ms: number;
+            /**
+             * Started At
+             * @default 0
+             */
+            started_at: number;
+            /** Ended At */
+            ended_at?: number | null;
+            /**
+             * Task Results
+             * @default []
+             */
+            task_results: components["schemas"]["TaskResultSummary"][];
+        };
+        /**
+         * BatchSummary
+         * @description Summary of a batch evaluation run.
+         */
+        BatchSummary: {
+            /** Batch Id */
+            batch_id: string;
+            /**
+             * Benchmark Name
+             * @default
+             */
+            benchmark_name: string;
+            /**
+             * Total Tasks
+             * @default 0
+             */
+            total_tasks: number;
+            /**
+             * Passed
+             * @default 0
+             */
+            passed: number;
+            /**
+             * Failed
+             * @default 0
+             */
+            failed: number;
+            /**
+             * Errors
+             * @default 0
+             */
+            errors: number;
+            /**
+             * Pass Rate
+             * @default 0
+             */
+            pass_rate: number;
+            /**
+             * Total Tokens
+             * @default 0
+             */
+            total_tokens: number;
+            /**
+             * Total Cost
+             * @default 0
+             */
+            total_cost: number;
+            /**
+             * Duration Ms
+             * @default 0
+             */
+            duration_ms: number;
+            /**
+             * Started At
+             * @default 0
+             */
+            started_at: number;
+            /** Ended At */
+            ended_at?: number | null;
+        };
+        /**
          * EpisodeDetail
          * @description Full episode detail including sandbox info and step data.
          */
@@ -346,6 +511,20 @@ export interface components {
             engine_started: boolean;
             /** Stores Available */
             stores_available: boolean;
+        };
+        /**
+         * PaginatedBatches
+         * @description Paginated list of batch summaries.
+         */
+        PaginatedBatches: {
+            /** Items */
+            items: components["schemas"]["BatchSummary"][];
+            /** Total */
+            total: number;
+            /** Offset */
+            offset: number;
+            /** Limit */
+            limit: number;
         };
         /**
          * PaginatedEpisodes
@@ -456,6 +635,43 @@ export interface components {
             cpu_percent?: number | null;
             /** Memory Mb */
             memory_mb?: number | null;
+        };
+        /**
+         * TaskResultSummary
+         * @description Summary of a single task result within a batch.
+         */
+        TaskResultSummary: {
+            /** Task Name */
+            task_name: string;
+            /**
+             * Episode Id
+             * @default
+             */
+            episode_id: string;
+            /** Outcome */
+            outcome: string;
+            /** Score */
+            score?: number | null;
+            /**
+             * Wall Clock Ms
+             * @default 0
+             */
+            wall_clock_ms: number;
+            /**
+             * Step Count
+             * @default 0
+             */
+            step_count: number;
+            /**
+             * Token Count
+             * @default 0
+             */
+            token_count: number;
+            /**
+             * Estimated Cost
+             * @default 0
+             */
+            estimated_cost: number;
         };
         /**
          * TaskSummary
@@ -587,6 +803,71 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_batches_api_batches_get: {
+        parameters: {
+            query?: {
+                /** @description Zero-based offset */
+                offset?: number;
+                /** @description Max items to return */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedBatches"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_batch_api_batches__batch_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_episodes_api_episodes_get: {
         parameters: {
             query?: {
