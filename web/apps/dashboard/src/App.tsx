@@ -8,6 +8,7 @@ import Launcher from '@/routes/Launcher'
 import Runs from '@/routes/Runs'
 import RunDetail from '@/routes/RunDetail'
 import SandboxDetail from '@/routes/SandboxDetail'
+import BatchDetail from '@/routes/BatchDetail'
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
               <Route path="/runs" element={<Runs />} />
               <Route path="/runs/:id" element={<RunDetail />} />
               <Route path="/sandboxes/:id" element={<SandboxDetail />} />
+              <Route path="/batches/:id" element={<BatchDetail />} />
             </Routes>
           </main>
         </div>

@@ -23,8 +23,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { StatusBadge } from '@/components/StatusBadge'
-import { fetchEpisodes, type EpisodeSummary } from '@/lib/api'
+import { fetchEpisodes, fetchBatches, type EpisodeSummary, type BatchSummary } from '@/lib/api'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -159,6 +160,97 @@ function buildColumns(navigate: ReturnType<typeof useNavigate>): ColumnDef<Episo
 }
 
 // ---------------------------------------------------------------------------
+// Batches tab
+// ---------------------------------------------------------------------------
+
+function BatchesTab() {
+  const navigate = useNavigate()
+  const [batches, setBatches] = useState<BatchSummary[]>([])
+  const [loadingBatches, setLoadingBatches] = useState(true)
+  const [batchError, setBatchError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoadingBatches(true)
+    setBatchError(null)
+    fetchBatches({ limit: 50 })
+      .then((data) => {
+        setBatches(data.items)
+      })
+      .catch((e) => {
+        setBatchError(e instanceof Error ? e.message : 'Failed to load batches.')
+      })
+      .finally(() => setLoadingBatches(false))
+  }, [])
+
+  if (loadingBatches) {
+    return (
+      <div className="space-y-2 mt-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full" />
+        ))}
+      </div>
+    )
+  }
+
+  if (batchError) {
+    return <p className="text-sm text-red-400 mt-4">Error: {batchError}</p>
+  }
+
+  if (batches.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center mt-4">
+        <p className="text-neutral-400 text-sm">No batches found.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-4 space-y-1">
+      {batches.map((batch) => {
+        const completed = batch.passed + batch.failed + batch.errors
+        const passRatePct =
+          completed > 0 ? ((batch.passed / completed) * 100).toFixed(1) : '--'
+
+        return (
+          <div
+            key={batch.batch_id}
+            onClick={() => navigate(`/batches/${batch.batch_id}`)}
+            className="flex items-center gap-4 rounded-lg border border-zinc-800 bg-zinc-900/30 px-4 py-3 cursor-pointer hover:bg-zinc-800/50 transition-colors"
+          >
+            {/* Batch ID */}
+            <span className="font-mono text-sm text-zinc-200 w-40 truncate shrink-0">
+              {batch.batch_id.slice(0, 20)}
+            </span>
+
+            {/* Benchmark name */}
+            <span className="font-mono text-xs text-zinc-500 flex-1 truncate">
+              {batch.benchmark_name || '--'}
+            </span>
+
+            {/* Progress */}
+            <span className="text-xs text-zinc-400 shrink-0">
+              {completed}/{batch.total_tasks} complete
+            </span>
+
+            {/* Pass rate */}
+            <span className="text-xs font-mono text-green-400 w-16 text-right shrink-0">
+              {passRatePct !== '--' ? `${passRatePct}%` : '--'}
+            </span>
+
+            {/* Started at */}
+            {batch.started_at > 0 && (
+              <span className="text-xs text-zinc-500 shrink-0">
+                {formatDistanceToNow(new Date(batch.started_at * 1000), { addSuffix: true })}
+              </span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Runs page
 // ---------------------------------------------------------------------------
 
@@ -267,169 +359,187 @@ export default function Runs() {
         <p className="text-sm text-neutral-400 mt-1">Browse and filter past evaluation runs.</p>
       </div>
 
-      {/* Filter bar */}
-      <div className="flex flex-wrap gap-2 items-center">
-        {/* Outcome chips */}
-        {(['pass', 'fail', 'error'] as const).map((outcome) => (
-          <Button
-            key={outcome}
-            variant="outline"
-            size="sm"
-            onClick={() => toggleOutcome(outcome)}
-            className={
-              outcomeFilters.has(outcome)
-                ? outcome === 'pass'
-                  ? 'bg-green-500/10 text-green-400 border-green-500/40'
-                  : outcome === 'fail'
-                  ? 'bg-red-500/10 text-red-400 border-red-500/40'
-                  : 'bg-orange-500/10 text-orange-400 border-orange-500/40'
-                : ''
-            }
-          >
-            {outcome}
-          </Button>
-        ))}
+      {/* Episodes / Batches tabs */}
+      <Tabs defaultValue="episodes">
+        <TabsList>
+          <TabsTrigger value="episodes">Episodes</TabsTrigger>
+          <TabsTrigger value="batches">Batches</TabsTrigger>
+        </TabsList>
 
-        {/* Task name search */}
-        <Input
-          type="text"
-          placeholder="Filter by task..."
-          value={taskSearch}
-          onChange={(e) => setTaskSearch(e.target.value)}
-          className="h-8 w-48 text-sm"
-        />
-
-        {/* Date range */}
-        <Input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          className="h-8 w-36 text-sm"
-          title="From date"
-        />
-        <Input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          className="h-8 w-36 text-sm"
-          title="To date"
-        />
-
-        {/* Score threshold */}
-        <Input
-          type="number"
-          placeholder="Min score"
-          value={scoreMin}
-          onChange={(e) => setScoreMin(e.target.value)}
-          step="0.1"
-          min="0"
-          max="1"
-          className="h-8 w-28 text-sm"
-        />
-
-        {/* Clear filters */}
-        {(outcomeFilters.size > 0 || taskSearch || dateFrom || dateTo || scoreMin) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 text-neutral-400 hover:text-neutral-200"
-            onClick={() => {
-              setOutcomeFilters(new Set())
-              setTaskSearch('')
-              setDateFrom('')
-              setDateTo('')
-              setScoreMin('')
-            }}
-          >
-            Clear
-          </Button>
-        )}
-      </div>
-
-      {/* Error */}
-      {fetchError && (
-        <p className="text-sm text-red-400">Error: {fetchError}</p>
-      )}
-
-      {/* Table */}
-      {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-10 w-full" />
-          ))}
-        </div>
-      ) : episodes.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-neutral-400 text-sm">No runs found. Adjust filters or launch a new experiment.</p>
-          <Link
-            to="/launcher"
-            className="mt-3 text-sm text-blue-400 hover:text-blue-300 underline underline-offset-4"
-          >
-            Go to Launcher
-          </Link>
-        </div>
-      ) : (
-        <>
-          <Table>
-            <TableHeader>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="border-neutral-800 hover:bg-transparent">
-                  {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className="text-neutral-400">
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
-                    </TableHead>
-                  ))}
-                </TableRow>
+        {/* Episodes tab */}
+        <TabsContent value="episodes">
+          <div className="space-y-4 mt-4">
+            {/* Filter bar */}
+            <div className="flex flex-wrap gap-2 items-center">
+              {/* Outcome chips */}
+              {(['pass', 'fail', 'error'] as const).map((outcome) => (
+                <Button
+                  key={outcome}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => toggleOutcome(outcome)}
+                  className={
+                    outcomeFilters.has(outcome)
+                      ? outcome === 'pass'
+                        ? 'bg-green-500/10 text-green-400 border-green-500/40'
+                        : outcome === 'fail'
+                        ? 'bg-red-500/10 text-red-400 border-red-500/40'
+                        : 'bg-orange-500/10 text-orange-400 border-orange-500/40'
+                      : ''
+                  }
+                >
+                  {outcome}
+                </Button>
               ))}
-            </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows.map((row) => {
-                const episode = row.original
-                return (
-                  <TableRow
-                    key={row.id}
-                    onClick={() => navigate(`/runs/${episode.episode_id}`)}
-                    className="cursor-pointer hover:bg-neutral-800/50 border-neutral-800"
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
 
-          {/* Pagination */}
-          <div className="flex items-center justify-between text-sm text-neutral-400 pt-2">
-            <span>
-              Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}
-            </span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={offset === 0}
-                onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={offset + PAGE_SIZE >= total}
-                onClick={() => setOffset(offset + PAGE_SIZE)}
-              >
-                Next
-              </Button>
+              {/* Task name search */}
+              <Input
+                type="text"
+                placeholder="Filter by task..."
+                value={taskSearch}
+                onChange={(e) => setTaskSearch(e.target.value)}
+                className="h-8 w-48 text-sm"
+              />
+
+              {/* Date range */}
+              <Input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-8 w-36 text-sm"
+                title="From date"
+              />
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-8 w-36 text-sm"
+                title="To date"
+              />
+
+              {/* Score threshold */}
+              <Input
+                type="number"
+                placeholder="Min score"
+                value={scoreMin}
+                onChange={(e) => setScoreMin(e.target.value)}
+                step="0.1"
+                min="0"
+                max="1"
+                className="h-8 w-28 text-sm"
+              />
+
+              {/* Clear filters */}
+              {(outcomeFilters.size > 0 || taskSearch || dateFrom || dateTo || scoreMin) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-neutral-400 hover:text-neutral-200"
+                  onClick={() => {
+                    setOutcomeFilters(new Set())
+                    setTaskSearch('')
+                    setDateFrom('')
+                    setDateTo('')
+                    setScoreMin('')
+                  }}
+                >
+                  Clear
+                </Button>
+              )}
             </div>
+
+            {/* Error */}
+            {fetchError && (
+              <p className="text-sm text-red-400">Error: {fetchError}</p>
+            )}
+
+            {/* Table */}
+            {loading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
+                ))}
+              </div>
+            ) : episodes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <p className="text-neutral-400 text-sm">No runs found. Adjust filters or launch a new experiment.</p>
+                <Link
+                  to="/launcher"
+                  className="mt-3 text-sm text-blue-400 hover:text-blue-300 underline underline-offset-4"
+                >
+                  Go to Launcher
+                </Link>
+              </div>
+            ) : (
+              <>
+                <Table>
+                  <TableHeader>
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <TableRow key={headerGroup.id} className="border-neutral-800 hover:bg-transparent">
+                        {headerGroup.headers.map((header) => (
+                          <TableHead key={header.id} className="text-neutral-400">
+                            {header.isPlaceholder
+                              ? null
+                              : flexRender(header.column.columnDef.header, header.getContext())}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableHeader>
+                  <TableBody>
+                    {table.getRowModel().rows.map((row) => {
+                      const episode = row.original
+                      return (
+                        <TableRow
+                          key={row.id}
+                          onClick={() => navigate(`/runs/${episode.episode_id}`)}
+                          className="cursor-pointer hover:bg-neutral-800/50 border-neutral-800"
+                        >
+                          {row.getVisibleCells().map((cell) => (
+                            <TableCell key={cell.id}>
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+
+                {/* Pagination */}
+                <div className="flex items-center justify-between text-sm text-neutral-400 pt-2">
+                  <span>
+                    Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={offset === 0}
+                      onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={offset + PAGE_SIZE >= total}
+                      onClick={() => setOffset(offset + PAGE_SIZE)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-        </>
-      )}
+        </TabsContent>
+
+        {/* Batches tab */}
+        <TabsContent value="batches">
+          <BatchesTab />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
