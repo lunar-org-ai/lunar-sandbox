@@ -38,8 +38,8 @@ export interface TraceGraphProps {
 
 function TraceGraphInner({ spans, isLive, onSpanSelect, selectedSpanId }: TraceGraphProps) {
   const { fitView } = useReactFlow()
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
+  const [nodes, setNodes, onNodesChange] = useNodesState([] as Node[])
+  const [edges, setEdges, onEdgesChange] = useEdgesState([] as Edge[])
 
   // Track the active span ID (last running span during live mode)
   const activeSpanId = useMemo(() => {
