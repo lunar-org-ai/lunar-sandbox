@@ -29,6 +29,7 @@ export interface TraceTimelineProps {
 const ZOOM_MIN = 0.25
 const ZOOM_MAX = 10
 const ZOOM_STEP = 0.15
+const AT_BOTTOM_THRESHOLD_PX = 50
 
 // ---------------------------------------------------------------------------
 // TraceTimeline
@@ -54,6 +55,11 @@ export function TraceTimeline({
 
   // Ref for attaching the wheel listener (non-passive)
   const barPanelRef = useRef<HTMLDivElement>(null)
+
+  // --- Auto-scroll / new events tracking ---
+  const isAtBottomRef = useRef(true)
+  const prevSpanCountRef = useRef(spans.length)
+  const [newCount, setNewCount] = useState(0)
 
   // --- Derived: totalMs ---
   const totalMs = useMemo(() => {
@@ -98,6 +104,52 @@ export function TraceTimeline({
     [onSpanSelect, selectedSpanId],
   )
 
+  // --- Auto-scroll to latest when live and at bottom ---
+  useEffect(() => {
+    if (!isLive) {
+      // Reset counters for historical episodes
+      prevSpanCountRef.current = spans.length
+      setNewCount(0)
+      return
+    }
+
+    const currentCount = spans.length
+    const prevCount = prevSpanCountRef.current
+    prevSpanCountRef.current = currentCount
+
+    if (currentCount <= prevCount) return // no new spans
+
+    const newlyArrived = currentCount - prevCount
+
+    if (isAtBottomRef.current) {
+      // Auto-scroll the bar panel
+      const barEl = barScrollRef.current
+      if (barEl) {
+        barEl.scrollTo({ top: barEl.scrollHeight, behavior: 'smooth' })
+      }
+      // Reset new count since we're following the stream
+      setNewCount(0)
+    } else {
+      // User has scrolled away — increment counter
+      setNewCount((prev) => prev + newlyArrived)
+    }
+  }, [isLive, spans.length])
+
+  // --- Check if at bottom helper ---
+  const checkAtBottom = useCallback((el: HTMLDivElement) => {
+    return el.scrollHeight - el.scrollTop - el.clientHeight < AT_BOTTOM_THRESHOLD_PX
+  }, [])
+
+  // --- Scroll to bottom and reset new count ---
+  const scrollToBottom = useCallback(() => {
+    const barEl = barScrollRef.current
+    if (barEl) {
+      barEl.scrollTo({ top: barEl.scrollHeight, behavior: 'smooth' })
+    }
+    isAtBottomRef.current = true
+    setNewCount(0)
+  }, [])
+
   // --- Synchronized vertical scrolling ---
   const onLabelScroll = useCallback(() => {
     if (syncingRef.current) return
@@ -117,7 +169,15 @@ export function TraceTimeline({
     syncingRef.current = true
     labelEl.scrollTop = barEl.scrollTop
     syncingRef.current = false
-  }, [])
+
+    // Update "at bottom" tracking
+    if (barEl) {
+      isAtBottomRef.current = checkAtBottom(barEl)
+      if (isAtBottomRef.current) {
+        setNewCount(0)
+      }
+    }
+  }, [checkAtBottom])
 
   // --- Ctrl/Cmd + scroll zoom (non-passive) ---
   useEffect(() => {
@@ -138,6 +198,16 @@ export function TraceTimeline({
     }
   }, [])
 
+  // Determine which span should pulse (last span during live mode)
+  const lastSpanId = useMemo(() => {
+    if (!isLive || filteredSpans.length === 0) return null
+    const lastSpan = filteredSpans[filteredSpans.length - 1]
+    if (!lastSpan) return null
+    return lastSpan.status === 'running' || lastSpan.status === 'completed'
+      ? lastSpan.id
+      : null
+  }, [isLive, filteredSpans])
+
   // --- Empty state ---
   if (spans.length === 0) {
     return (
@@ -151,7 +221,7 @@ export function TraceTimeline({
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="relative flex h-full flex-col overflow-hidden">
       {/* 1. Status bar */}
       <StatusBar isLive={isLive} totalSpans={totalSpans} />
 
@@ -248,6 +318,7 @@ export function TraceTimeline({
                     totalMs={totalMs}
                     zoom={zoom}
                     isSelected={selectedSpanId === span.id}
+                    isPulsing={span.id === lastSpanId}
                     onClick={() => handleSpanClick(span)}
                   />
                 ))}
@@ -256,6 +327,19 @@ export function TraceTimeline({
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
+
+      {/* 4. "New events" floating pill badge */}
+      {isLive && !isAtBottomRef.current && newCount > 0 && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+          <button
+            type="button"
+            onClick={scrollToBottom}
+            className="pointer-events-auto bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-lg cursor-pointer transition-colors"
+          >
+            {newCount} new event{newCount !== 1 ? 's' : ''} &darr;
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -14,6 +14,7 @@ interface TraceTimelineRowBaseProps {
 interface TraceTimelineRowBarProps extends TraceTimelineRowBaseProps {
   totalMs: number
   zoom: number
+  isPulsing?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -71,6 +72,7 @@ export function TraceTimelineRowBar({
   totalMs,
   zoom,
   isSelected,
+  isPulsing = false,
   onClick,
 }: TraceTimelineRowBarProps) {
   const color = getActionColor(span.action)
@@ -110,6 +112,7 @@ export function TraceTimelineRowBar({
           color.bg,
           isError && 'border-2 border-red-500',
           isSelected ? 'opacity-100 ring-1 ring-white/30' : 'opacity-80 hover:opacity-100',
+          isPulsing && 'animate-pulse',
         )}
         style={{
           left: `${leftPct}%`,
