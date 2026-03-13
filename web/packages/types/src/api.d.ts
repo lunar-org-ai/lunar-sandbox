@@ -111,6 +111,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/pool/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pool Health
+         * @description Return detailed pool health with per-fingerprint breakdown.
+         */
+        get: operations["pool_health_api_pool_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sandboxes": {
         parameters: {
             query?: never;
@@ -495,6 +515,36 @@ export interface components {
             /** Ended At */
             ended_at?: number | null;
         };
+        /**
+         * FingerprintHealth
+         * @description Health metrics for a single fingerprint group.
+         */
+        FingerprintHealth: {
+            /** Fingerprint */
+            fingerprint: string;
+            /**
+             * Idle Count
+             * @default 0
+             */
+            idle_count: number;
+            /**
+             * Active Count
+             * @default 0
+             */
+            active_count: number;
+            /**
+             * Total Count
+             * @default 0
+             */
+            total_count: number;
+            /**
+             * Eviction Count
+             * @default 0
+             */
+            eviction_count: number;
+            /** Cache Hit Rate */
+            cache_hit_rate?: number | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -567,6 +617,28 @@ export interface components {
             offset: number;
             /** Limit */
             limit: number;
+        };
+        /**
+         * PoolHealthDetail
+         * @description Detailed pool health with per-fingerprint breakdown.
+         */
+        PoolHealthDetail: {
+            /** Running */
+            running: boolean;
+            /** Total Sandboxes */
+            total_sandboxes: number;
+            /**
+             * Fingerprints
+             * @default []
+             */
+            fingerprints: components["schemas"]["FingerprintHealth"][];
+            /** Overall Cache Hit Rate */
+            overall_cache_hit_rate?: number | null;
+            /**
+             * Total Evictions
+             * @default 0
+             */
+            total_evictions: number;
         };
         /**
          * PoolStatus
@@ -1203,6 +1275,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    pool_health_api_pool_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PoolHealthDetail"];
                 };
             };
         };

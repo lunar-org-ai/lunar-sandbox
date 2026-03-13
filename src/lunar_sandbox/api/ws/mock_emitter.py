@@ -2,15 +2,16 @@
 
 When the engine cannot start (Linux-only kernel features), this
 emitter publishes synthetic trace events, sandbox_status events,
-batch_progress events, and telemetry_metric events on a timer so
-the entire WebSocket pipeline can be developed and tested without a
-running engine.
+batch_progress events, telemetry_metric events, and pool_health events
+on a timer so the entire WebSocket pipeline can be developed and tested
+without a running engine.
 
 Emission schedule:
 - Every 2 seconds (even ticks): trace_event on sandbox:mock:episode:demo
 - Every 4 seconds (tick % 2 == 1): sandbox_status for one of 3 mock sandboxes
 - Every 4 seconds (tick % 2 == 1): batch_progress on batch:mock-batch-1
 - Every 6 seconds (tick % 3 == 2): telemetry_metric on telemetry:mock-run-1
+- Every 8 seconds (tick % 4 == 3): pool_health on pool:health
 """
 
 from __future__ import annotations
@@ -224,6 +225,52 @@ async def run_mock_emitter(hub: EventHub, interval: float = 2.0) -> None:
                                 "unit": "ratio",
                             },
                         ],
+                    },
+                )
+
+            # Pool health event every 8 seconds (tick % 4 == 3)
+            if tick % 4 == 3:
+                # Vary idle/active counts by +/-1 each tick to show live updating
+                fp_health = [
+                    {
+                        "fingerprint": "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+                        "idle_count": max(0, 4 + random.randint(-1, 1)),
+                        "active_count": max(0, 2 + random.randint(-1, 1)),
+                        "eviction_count": 12 + (tick // 4),
+                        "cache_hit_rate": round(random.uniform(0.80, 0.95), 3),
+                    },
+                    {
+                        "fingerprint": "sha256:f9e8d7c6b5a4f9e8d7c6b5a4f9e8d7c6",
+                        "idle_count": max(0, 2 + random.randint(-1, 1)),
+                        "active_count": max(0, 3 + random.randint(-1, 1)),
+                        "eviction_count": 7 + (tick // 8),
+                        "cache_hit_rate": round(random.uniform(0.55, 0.70), 3),
+                    },
+                    {
+                        "fingerprint": "sha256:0102030405060102030405060102030405",
+                        "idle_count": max(0, 1 + random.randint(-1, 0)),
+                        "active_count": max(0, random.randint(0, 1)),
+                        "eviction_count": 18 + (tick // 4),
+                        "cache_hit_rate": round(random.uniform(0.35, 0.50), 3),
+                    },
+                ]
+                for fp in fp_health:
+                    fp["total_count"] = fp["idle_count"] + fp["active_count"]
+
+                total_sandboxes = sum(fp["total_count"] for fp in fp_health)
+                total_evictions = sum(fp["eviction_count"] for fp in fp_health)
+                hit_rates = [fp["cache_hit_rate"] for fp in fp_health if fp["cache_hit_rate"] is not None]
+                overall_hit_rate = round(sum(hit_rates) / len(hit_rates), 3) if hit_rates else None
+
+                hub.publish_event(
+                    type="pool_health",
+                    topic="pool:health",
+                    payload={
+                        "running": False,
+                        "total_sandboxes": total_sandboxes,
+                        "fingerprints": fp_health,
+                        "overall_cache_hit_rate": overall_hit_rate,
+                        "total_evictions": total_evictions,
                     },
                 )
 

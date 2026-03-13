@@ -8,6 +8,8 @@ export type HealthResponse = components['schemas']['HealthResponse']
 export type EpisodeSummary = components['schemas']['EpisodeSummary']
 export type EpisodeDetail = components['schemas']['EpisodeDetail']
 export type PaginatedEpisodes = components['schemas']['PaginatedEpisodes']
+export type FingerprintHealth = components['schemas']['FingerprintHealth']
+export type PoolHealthDetail = components['schemas']['PoolHealthDetail']
 export type PoolStatus = components['schemas']['PoolStatus']
 export type SandboxInfo = components['schemas']['SandboxInfo']
 export type TaskSummary = components['schemas']['TaskSummary']
@@ -144,6 +146,12 @@ export async function fetchBatches(params?: {
 
 export async function fetchBatch(batchId: string): Promise<BatchDetail> {
   const res = await fetch(`/api/batches/${encodeURIComponent(batchId)}`)
+  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  return res.json()
+}
+
+export async function fetchPoolHealth(): Promise<PoolHealthDetail> {
+  const res = await fetch('/api/pool/health')
   if (!res.ok) throw new Error(`API error: ${res.status}`)
   return res.json()
 }

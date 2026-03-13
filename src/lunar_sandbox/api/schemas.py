@@ -18,11 +18,13 @@ __all__ = [
     "BatchSummary",
     "EpisodeDetail",
     "EpisodeSummary",
+    "FingerprintHealth",
     "HealthResponse",
     "PaginatedBatches",
     "PaginatedEpisodes",
     "PaginatedTasks",
     "PaginatedTelemetryRuns",
+    "PoolHealthDetail",
     "PoolStatus",
     "RunLaunchResponse",
     "RunRequest",
@@ -112,6 +114,27 @@ class PoolStatus(BaseModel):
     running: bool
     total_sandboxes: int
     sandboxes: list[SandboxInfo] = []
+
+
+class FingerprintHealth(BaseModel):
+    """Health metrics for a single fingerprint group."""
+
+    fingerprint: str
+    idle_count: int = 0
+    active_count: int = 0
+    total_count: int = 0
+    eviction_count: int = 0
+    cache_hit_rate: float | None = None
+
+
+class PoolHealthDetail(BaseModel):
+    """Detailed pool health with per-fingerprint breakdown."""
+
+    running: bool
+    total_sandboxes: int
+    fingerprints: list[FingerprintHealth] = []
+    overall_cache_hit_rate: float | None = None
+    total_evictions: int = 0
 
 
 # ---------------------------------------------------------------------------

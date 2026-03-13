@@ -101,7 +101,7 @@ export function CostChart({ data, inputTokens, outputTokens, totalCost }: CostCh
               width={55}
             />
             <Tooltip
-              formatter={(value: number) => [formatUsdTooltip(value), 'Cost']}
+              formatter={(value) => [formatUsdTooltip(typeof value === 'number' ? value : 0), 'Cost']}
               contentStyle={{
                 background: '#18181b',
                 border: '1px solid #3f3f46',
