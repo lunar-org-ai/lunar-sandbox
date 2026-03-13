@@ -434,6 +434,10 @@ export interface components {
             env_vars?: {
                 [key: string]: string;
             } | null;
+            /** Cpu Cores */
+            cpu_cores?: number | null;
+            /** Memory Mb */
+            memory_mb?: number | null;
         };
         /**
          * SandboxInfo

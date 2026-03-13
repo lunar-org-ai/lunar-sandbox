@@ -164,6 +164,8 @@ class RunRequest(BaseModel):
     parallelism: int = 1
     timeout: int | None = None
     env_vars: dict[str, str] | None = None
+    cpu_cores: int | None = None
+    memory_mb: int | None = None
 
 
 class RunLaunchResponse(BaseModel):
