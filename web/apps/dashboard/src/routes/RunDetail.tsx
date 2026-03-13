@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { format } from 'date-fns'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, GitBranch, LayoutGrid, List } from 'lucide-react'
 import type { PanelImperativeHandle } from 'react-resizable-panels'
 
 import {
@@ -18,6 +18,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/StatusBadge'
 import { TraceDetailPanel } from '@/components/TraceDetailPanel'
+import { TraceGraph } from '@/components/TraceGraph'
 import { TraceTimeline } from '@/components/TraceTimeline'
 import { useTraceStream } from '@/hooks/useTraceStream'
 import { fetchEpisode, type EpisodeDetail } from '@/lib/api'
@@ -172,6 +173,12 @@ interface RunDetailContentProps {
   detailPanelRef: React.RefObject<PanelImperativeHandle | null>
 }
 
+// ---------------------------------------------------------------------------
+// View mode types
+// ---------------------------------------------------------------------------
+
+type ViewMode = 'timeline' | 'graph' | 'split'
+
 function RunDetailContent({
   episode,
   episodeId,
@@ -186,6 +193,17 @@ function RunDetailContent({
     initialSteps: episode.steps as Record<string, unknown>[],
     episodeStartTs: episode.started_at,
   })
+
+  // --- View mode state ---
+  const [viewMode, setViewMode] = useState<ViewMode>('timeline')
+
+  // --- Derive card title from view mode ---
+  const cardTitle =
+    viewMode === 'timeline'
+      ? 'Trace Timeline'
+      : viewMode === 'graph'
+        ? 'Trace Graph'
+        : 'Trace Timeline & Graph'
 
   return (
     <div className="max-w-6xl mx-auto p-8 space-y-6">
@@ -250,28 +268,101 @@ function RunDetailContent({
       {/* Trace Timeline + Detail Panel */}
       <Card className="overflow-hidden rounded-lg border border-zinc-800 p-0">
         <CardHeader className="border-b border-zinc-800 px-4 py-3">
-          <CardTitle className="text-sm font-medium text-zinc-300">Trace Timeline</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium text-zinc-300">{cardTitle}</CardTitle>
+            {/* View mode toggle */}
+            <div className="flex gap-1 bg-zinc-800 rounded-md p-0.5">
+              <button
+                type="button"
+                title="Timeline"
+                onClick={() => setViewMode('timeline')}
+                className={`px-2 py-1 rounded text-xs transition-colors ${
+                  viewMode === 'timeline'
+                    ? 'bg-zinc-700 text-zinc-200'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                <List className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                title="Graph"
+                onClick={() => setViewMode('graph')}
+                className={`px-2 py-1 rounded text-xs transition-colors ${
+                  viewMode === 'graph'
+                    ? 'bg-zinc-700 text-zinc-200'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                <GitBranch className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                title="Split view"
+                onClick={() => setViewMode('split')}
+                className={`px-2 py-1 rounded text-xs transition-colors ${
+                  viewMode === 'split'
+                    ? 'bg-zinc-700 text-zinc-200'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                <LayoutGrid className="size-3.5" />
+              </button>
+            </div>
+          </div>
         </CardHeader>
         <div
           className="overflow-hidden"
           style={{ height: 'calc(100vh - 420px)', minHeight: 360 }}
         >
           <ResizablePanelGroup orientation="horizontal" className="h-full">
-            {/* Left panel: Timeline */}
+            {/* Left panel: Timeline / Graph / Split */}
             <ResizablePanel defaultSize={selectedSpan ? 65 : 100} minSize={40}>
-              <TraceTimeline
-                spans={spans}
-                isLive={isLive}
-                totalSpans={totalSpans}
-                onSpanSelect={setSelectedSpan}
-                selectedSpanId={selectedSpan?.id ?? null}
-              />
+              {viewMode === 'timeline' && (
+                <TraceTimeline
+                  spans={spans}
+                  isLive={isLive}
+                  totalSpans={totalSpans}
+                  onSpanSelect={setSelectedSpan}
+                  selectedSpanId={selectedSpan?.id ?? null}
+                />
+              )}
+              {viewMode === 'graph' && (
+                <TraceGraph
+                  spans={spans}
+                  isLive={isLive}
+                  onSpanSelect={setSelectedSpan}
+                  selectedSpanId={selectedSpan?.id ?? null}
+                />
+              )}
+              {viewMode === 'split' && (
+                <ResizablePanelGroup orientation="vertical" className="h-full">
+                  <ResizablePanel defaultSize={50} minSize={25}>
+                    <TraceTimeline
+                      spans={spans}
+                      isLive={isLive}
+                      totalSpans={totalSpans}
+                      onSpanSelect={setSelectedSpan}
+                      selectedSpanId={selectedSpan?.id ?? null}
+                    />
+                  </ResizablePanel>
+                  <ResizableHandle withHandle />
+                  <ResizablePanel defaultSize={50} minSize={25}>
+                    <TraceGraph
+                      spans={spans}
+                      isLive={isLive}
+                      onSpanSelect={setSelectedSpan}
+                      selectedSpanId={selectedSpan?.id ?? null}
+                    />
+                  </ResizablePanel>
+                </ResizablePanelGroup>
+              )}
             </ResizablePanel>
 
             {/* Handle only visible when detail panel open */}
             {selectedSpan && <ResizableHandle withHandle />}
 
-            {/* Right panel: Detail panel */}
+            {/* Right panel: Detail panel — shared between all view modes */}
             <ResizablePanel
               defaultSize={35}
               minSize={20}
