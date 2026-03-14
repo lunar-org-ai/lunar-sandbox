@@ -23,7 +23,7 @@ class TestActionType:
     """Tests for ActionType enum."""
 
     def test_action_type_values(self) -> None:
-        """All 8 action types exist with correct string values."""
+        """All original action types exist with correct string values."""
         assert ActionType.EXECUTE_COMMAND == "execute_command"
         assert ActionType.READ_FILE == "read_file"
         assert ActionType.WRITE_FILE == "write_file"
@@ -32,7 +32,20 @@ class TestActionType:
         assert ActionType.SEARCH_CODE == "search_code"
         assert ActionType.RUN_TESTS == "run_tests"
         assert ActionType.GET_LOGS == "get_logs"
-        assert len(ActionType) == 8
+
+    def test_cua_action_type_values(self) -> None:
+        """All 11 CUA action types exist and match computer_20251124 primitives."""
+        assert ActionType.SCREENSHOT == "screenshot"
+        assert ActionType.MOUSE_MOVE == "mouse_move"
+        assert ActionType.LEFT_CLICK == "left_click"
+        assert ActionType.RIGHT_CLICK == "right_click"
+        assert ActionType.DOUBLE_CLICK == "double_click"
+        assert ActionType.MIDDLE_CLICK == "middle_click"
+        assert ActionType.LEFT_CLICK_DRAG == "left_click_drag"
+        assert ActionType.TYPE == "type"
+        assert ActionType.KEY == "key"
+        assert ActionType.SCROLL == "scroll"
+        assert ActionType.CURSOR_POSITION == "cursor_position"
 
 
 class TestActionStatus:
@@ -190,8 +203,7 @@ class TestActionTimeouts:
     """Tests for ACTION_TIMEOUTS mapping."""
 
     def test_action_timeouts(self) -> None:
-        """ACTION_TIMEOUTS has entries for all 8 action types."""
-        assert len(ACTION_TIMEOUTS) == 8
+        """ACTION_TIMEOUTS has entries for every ActionType member."""
         for action_type in ActionType:
             assert action_type in ACTION_TIMEOUTS
             assert isinstance(ACTION_TIMEOUTS[action_type], float)
