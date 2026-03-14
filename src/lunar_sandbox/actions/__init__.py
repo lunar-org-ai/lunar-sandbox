@@ -18,6 +18,7 @@ Public API::
 """
 
 from lunar_sandbox.actions.client import ActionClient
+from lunar_sandbox.actions.cua_handler import CUAActionHandler
 from lunar_sandbox.actions.diff import (
     diff_snapshots,
     inspect_upper_layer,
@@ -45,6 +46,8 @@ from lunar_sandbox.actions.types import (
 __all__ = [
     # Types
     "ActionType",
+    # CUA Handler
+    "CUAActionHandler",
     "ActionStatus",
     "ActionRequest",
     "ActionResponse",
