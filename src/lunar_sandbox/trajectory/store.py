@@ -163,6 +163,27 @@ class TrajectoryStore:
         self._conn.execute(_CREATE_TASKS)
         for idx_sql in _INDEXES:
             self._conn.execute(idx_sql)
+        self._migrate_add_episode_type()
+
+    def _migrate_add_episode_type(self) -> None:
+        """Add episode_type column to episodes table if it doesn't exist.
+
+        Also creates the idx_episodes_type index after ensuring the column exists,
+        so the index creation is safe for both fresh schemas and migrated ones.
+        """
+        assert self._conn is not None  # noqa: S101
+        columns = {
+            row[1] for row in self._conn.execute("PRAGMA table_info(episodes)").fetchall()
+        }
+        if "episode_type" not in columns:
+            self._conn.execute(
+                "ALTER TABLE episodes ADD COLUMN episode_type TEXT NOT NULL DEFAULT 'coding'"
+            )
+            logger.info("migration_episode_type_added")
+        # Index is created after the column is guaranteed to exist
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_episodes_type ON episodes(episode_type);"
+        )
 
     # -- task registration ---------------------------------------------------
 
@@ -244,8 +265,8 @@ class TrajectoryStore:
                 """INSERT OR REPLACE INTO episodes
                    (episode_id, task_name, outcome, score, step_count,
                     duration_ms, started_at, ended_at, is_complete,
-                    sandbox_id, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    sandbox_id, created_at, episode_type)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     episode_metadata["episode_id"],
                     episode_metadata["task_name"],
@@ -258,6 +279,7 @@ class TrajectoryStore:
                     int(episode_metadata.get("is_complete", True)),
                     episode_metadata.get("sandbox_id", ""),
                     created_at,
+                    episode_metadata.get("episode_type", "coding"),
                 ),
             )
 
@@ -354,12 +376,14 @@ class TrajectoryStore:
         *,
         task_name: str | None = None,
         episode_id: str | None = None,
+        episode_type: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Query episodes by task name and/or episode ID.
+        """Query episodes by task name, episode ID, and/or episode type.
 
         Args:
             task_name: Filter to episodes for this task.
             episode_id: Filter to a specific episode.
+            episode_type: Filter to episodes of this type (e.g. 'coding' or 'cua').
 
         Returns:
             List of episode dicts matching filters.
@@ -373,6 +397,9 @@ class TrajectoryStore:
         if episode_id is not None:
             clauses.append("episode_id = ?")
             params.append(episode_id)
+        if episode_type is not None:
+            clauses.append("episode_type = ?")
+            params.append(episode_type)
         where = " AND ".join(clauses)
         sql = "SELECT * FROM episodes"
         if where:
