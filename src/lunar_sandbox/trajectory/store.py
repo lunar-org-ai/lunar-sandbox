@@ -591,7 +591,8 @@ class TrajectoryStore:
 
         where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
         sql = (
-            "SELECT s.*, e.score AS ep_score, e.task_name AS ep_task_name "
+            "SELECT s.*, e.score AS ep_score, e.task_name AS ep_task_name, "
+            "e.episode_type AS ep_episode_type "
             "FROM steps s "
             "JOIN episodes e ON s.episode_id = e.episode_id"
             f"{where} "
@@ -605,6 +606,7 @@ class TrajectoryStore:
             # Enrich with episode-level fields
             d["score"] = d.pop("ep_score", None)
             d["task_name"] = d.pop("ep_task_name", None)
+            d["episode_type"] = d.pop("ep_episode_type", "coding")
             results.append(d)
 
         return results
@@ -668,6 +670,7 @@ class TrajectoryStore:
         max_score: float | None = None,
         start_time: float | None = None,
         end_time: float | None = None,
+        embed_screenshots: bool = False,
     ) -> int:
         """Export filtered steps to a Parquet file with snappy compression.
 
@@ -676,7 +679,11 @@ class TrajectoryStore:
 
         The output table has a flat schema with columns: ``episode_id``,
         ``step_idx``, ``action``, ``observation`` (JSON string), ``reward``,
-        ``score``, ``task_name``, ``duration_ms``, ``timestamp``.
+        ``score``, ``task_name``, ``duration_ms``, ``timestamp``,
+        ``screenshot_path``, ``screen_size``, ``episode_type``.
+
+        CUA-specific columns (``screenshot_path``, ``screen_size``) are nullable
+        and will be ``None`` for coding steps, enabling mixed-episode exports.
 
         Args:
             output_path: Destination Parquet file path.
@@ -686,6 +693,10 @@ class TrajectoryStore:
             max_score: Maximum episode score (inclusive).
             start_time: Minimum episode started_at timestamp.
             end_time: Maximum episode started_at timestamp.
+            embed_screenshots: When True, read screenshot files from disk and
+                embed them as raw bytes in a ``screenshot_data`` binary column.
+                Files are resolved as ``{db_dir}/{episode_id}/{screenshot_path}``.
+                Missing files gracefully produce ``None``.
 
         Returns:
             Number of steps exported.
@@ -722,7 +733,13 @@ class TrajectoryStore:
             "task_name": [],
             "duration_ms": [],
             "timestamp": [],
+            "screenshot_path": [],
+            "screen_size": [],
+            "episode_type": [],
         }
+        if embed_screenshots:
+            columns["screenshot_data"] = []
+
         for step in data:
             columns["episode_id"].append(step.get("episode_id", ""))
             columns["step_idx"].append(step.get("step_idx", 0))
@@ -736,21 +753,50 @@ class TrajectoryStore:
             columns["task_name"].append(step.get("task_name", ""))
             columns["duration_ms"].append(step.get("duration_ms", 0.0))
             columns["timestamp"].append(step.get("timestamp", 0.0))
+            columns["episode_type"].append(step.get("episode_type", "coding"))
 
-        schema = pa.schema(
-            [
-                pa.field("episode_id", pa.string()),
-                pa.field("step_idx", pa.int64()),
-                pa.field("action", pa.string()),
-                pa.field("observation", pa.string()),
-                pa.field("reward", pa.float64()),
-                pa.field("score", pa.float64()),
-                pa.field("task_name", pa.string()),
-                pa.field("duration_ms", pa.float64()),
-                pa.field("timestamp", pa.float64()),
-            ]
-        )
+            # CUA-specific nullable columns extracted from observation
+            if isinstance(obs, dict):
+                screenshot_path = obs.get("screenshot_path")
+                columns["screenshot_path"].append(screenshot_path)
+                screen_size = obs.get("screen_size")
+                columns["screen_size"].append(
+                    f"{screen_size[0]}x{screen_size[1]}" if screen_size else None
+                )
+            else:
+                screenshot_path = None
+                columns["screenshot_path"].append(None)
+                columns["screen_size"].append(None)
 
+            if embed_screenshots:
+                if screenshot_path:
+                    ep_id = step.get("episode_id", "")
+                    full_path = self._db_path.parent / ep_id / screenshot_path
+                    if full_path.exists():
+                        columns["screenshot_data"].append(full_path.read_bytes())
+                    else:
+                        columns["screenshot_data"].append(None)
+                else:
+                    columns["screenshot_data"].append(None)
+
+        schema_fields = [
+            pa.field("episode_id", pa.string()),
+            pa.field("step_idx", pa.int64()),
+            pa.field("action", pa.string()),
+            pa.field("observation", pa.string()),
+            pa.field("reward", pa.float64()),
+            pa.field("score", pa.float64()),
+            pa.field("task_name", pa.string()),
+            pa.field("duration_ms", pa.float64()),
+            pa.field("timestamp", pa.float64()),
+            pa.field("screenshot_path", pa.string()),
+            pa.field("screen_size", pa.string()),
+            pa.field("episode_type", pa.string()),
+        ]
+        if embed_screenshots:
+            schema_fields.append(pa.field("screenshot_data", pa.binary()))
+
+        schema = pa.schema(schema_fields)
         table = pa.Table.from_pydict(columns, schema=schema)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         pq.write_table(table, str(output_path), compression="snappy")
