@@ -15,9 +15,9 @@ function formatPercent(rate: number | null | undefined): string {
 }
 
 function hitRateColor(rate: number | null | undefined): string {
-  if (rate == null) return 'text-zinc-400'
-  if (rate >= 0.7) return 'text-green-400'
-  if (rate >= 0.5) return 'text-yellow-400'
+  if (rate == null) return 'text-muted-foreground'
+  if (rate >= 0.7) return 'text-emerald-400'
+  if (rate >= 0.5) return 'text-amber-400'
   return 'text-red-400'
 }
 
@@ -38,24 +38,24 @@ interface StatsBarProps {
 
 function StatsBar({ data }: StatsBarProps) {
   return (
-    <div className="flex flex-wrap gap-6 rounded-lg border border-zinc-800 bg-zinc-900/50 px-5 py-3">
+    <div className="flex flex-wrap gap-6 rounded-lg border border-border/50 bg-card/50 backdrop-blur-sm px-5 py-4">
       <div className="flex flex-col gap-0.5">
-        <span className="text-[10px] uppercase tracking-wider text-zinc-500">Total Sandboxes</span>
-        <span className="text-lg font-mono font-bold text-zinc-100">{data.total_sandboxes}</span>
+        <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Total Sandboxes</span>
+        <span className="text-xl font-mono font-bold tabular-nums">{data.total_sandboxes}</span>
       </div>
       <div className="flex flex-col gap-0.5">
-        <span className="text-[10px] uppercase tracking-wider text-zinc-500">Overall Cache Hit</span>
-        <span className={`text-lg font-mono font-bold ${hitRateColor(data.overall_cache_hit_rate)}`}>
+        <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Overall Cache Hit</span>
+        <span className={`text-xl font-mono font-bold tabular-nums ${hitRateColor(data.overall_cache_hit_rate)}`}>
           {formatPercent(data.overall_cache_hit_rate)}
         </span>
       </div>
       <div className="flex flex-col gap-0.5">
-        <span className="text-[10px] uppercase tracking-wider text-zinc-500">Total Evictions</span>
-        <span className="text-lg font-mono font-bold text-zinc-100">{data.total_evictions}</span>
+        <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Total Evictions</span>
+        <span className="text-xl font-mono font-bold tabular-nums">{data.total_evictions}</span>
       </div>
       <div className="flex flex-col gap-0.5">
-        <span className="text-[10px] uppercase tracking-wider text-zinc-500">Pool Running</span>
-        <span className={`text-sm font-semibold ${data.running ? 'text-green-400' : 'text-zinc-500'}`}>
+        <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Pool Running</span>
+        <span className={`text-sm font-semibold ${data.running ? 'text-emerald-400' : 'text-muted-foreground'}`}>
           {data.running ? 'Yes' : 'No (mock)'}
         </span>
       </div>
@@ -73,33 +73,33 @@ interface FingerprintCardProps {
 
 function FingerprintCard({ fp }: FingerprintCardProps) {
   return (
-    <Card className="bg-zinc-900/60 border-zinc-800">
+    <Card className="bg-card/50 border-border/50 backdrop-blur-sm">
       <CardHeader className="pb-2">
-        <CardTitle className="font-mono text-sm text-zinc-300 truncate" title={fp.fingerprint}>
+        <CardTitle className="font-mono text-sm text-foreground/80 truncate" title={fp.fingerprint}>
           {truncateHash(fp.fingerprint)}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {/* Idle / Active badges */}
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center rounded-md border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-400">
+          <span className="inline-flex items-center rounded-md border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-400">
             {fp.idle_count} idle
           </span>
-          <span className="inline-flex items-center rounded-md border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-xs font-medium text-green-400">
+          <span className="inline-flex items-center rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
             {fp.active_count} active
           </span>
         </div>
 
         {/* Stats grid */}
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-          <dt className="text-zinc-500">Total</dt>
-          <dd className="font-mono text-zinc-200">{fp.total_count}</dd>
+          <dt className="text-muted-foreground">Total</dt>
+          <dd className="font-mono tabular-nums">{fp.total_count}</dd>
 
-          <dt className="text-zinc-500">Evictions</dt>
-          <dd className="font-mono text-zinc-200">{fp.eviction_count}</dd>
+          <dt className="text-muted-foreground">Evictions</dt>
+          <dd className="font-mono tabular-nums">{fp.eviction_count}</dd>
 
-          <dt className="text-zinc-500">Cache hit</dt>
-          <dd className={`font-mono font-semibold ${hitRateColor(fp.cache_hit_rate)}`}>
+          <dt className="text-muted-foreground">Cache hit</dt>
+          <dd className={`font-mono font-semibold tabular-nums ${hitRateColor(fp.cache_hit_rate)}`}>
             {formatPercent(fp.cache_hit_rate)}
           </dd>
         </dl>
@@ -116,7 +116,7 @@ function PoolHealthSkeleton() {
   return (
     <div className="space-y-6">
       {/* Stats bar skeleton */}
-      <div className="flex flex-wrap gap-6 rounded-lg border border-zinc-800 bg-zinc-900/50 px-5 py-3">
+      <div className="flex flex-wrap gap-6 rounded-lg border border-border/50 bg-card/50 px-5 py-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="flex flex-col gap-1.5">
             <Skeleton className="h-3 w-20" />
@@ -127,7 +127,7 @@ function PoolHealthSkeleton() {
       {/* Card grid skeleton */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {Array.from({ length: 3 }).map((_, i) => (
-          <Card key={i} className="bg-zinc-900/60 border-zinc-800">
+          <Card key={i} className="bg-card/50 border-border/50">
             <CardHeader className="pb-2">
               <Skeleton className="h-4 w-32" />
             </CardHeader>
@@ -183,8 +183,11 @@ export default function PoolHealth() {
   }, [events])
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold tracking-tight">Pool Health</h1>
+    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Pool Health</h1>
+        <p className="text-sm text-muted-foreground mt-1">Monitor sandbox pool performance and cache metrics.</p>
+      </div>
 
       {error ? (
         <p className="text-destructive text-sm">{error}</p>

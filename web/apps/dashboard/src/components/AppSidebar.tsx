@@ -27,14 +27,19 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-1">
-          <span className="font-semibold text-sm truncate">LunarEngine</span>
+        <div className="flex items-center gap-2.5 px-2 py-1.5">
+          <div className="size-6 rounded-lg bg-foreground flex items-center justify-center shrink-0">
+            <span className="text-xs font-bold text-background">L</span>
+          </div>
+          <span className="font-semibold text-sm tracking-tight text-foreground truncate">LunarEngine</span>
         </div>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+            Navigation
+          </SidebarGroupLabel>
           <SidebarMenu>
             {navItems.map((item) => (
               <SidebarMenuItem key={item.url}>
@@ -44,7 +49,7 @@ export function AppSidebar() {
                   tooltip={item.title}
                 >
                   <Link to={item.url}>
-                    <item.icon />
+                    <item.icon className="size-4" />
                     <span>{item.title}</span>
                   </Link>
                 </SidebarMenuButton>

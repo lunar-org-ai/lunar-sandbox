@@ -74,9 +74,9 @@ const HEALTH_COLORS: Record<HealthStatus, string> = {
 }
 
 const HEALTH_BORDER: Record<HealthStatus, string> = {
-  healthy: 'border-zinc-700',
-  warning: 'border-amber-500/60',
-  critical: 'border-red-500/60',
+  healthy: 'border-border/50',
+  warning: 'border-amber-500/40',
+  critical: 'border-red-500/40',
 }
 
 // ---------------------------------------------------------------------------
@@ -106,13 +106,13 @@ export function MetricCard({ name, metricKey, current, values, unit }: MetricCar
   const displayUnit = hasData ? getUnitLabel(metricKey, unit) : ''
 
   return (
-    <div className={`rounded-lg border ${borderClass} p-4 bg-zinc-900`}>
+    <div className={`rounded-lg border ${borderClass} p-4 bg-card/50 backdrop-blur-sm`}>
       {/* Top row: name + health indicator */}
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-zinc-400 uppercase tracking-wide">{name}</span>
+        <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{name}</span>
         <span className="flex items-center">
           {health === 'healthy' && (
-            <span className="size-2 rounded-full bg-green-500" />
+            <span className="size-2 rounded-full bg-emerald-500" />
           )}
           {health === 'warning' && (
             <AlertTriangle className="text-amber-400 size-4" />
@@ -125,11 +125,11 @@ export function MetricCard({ name, metricKey, current, values, unit }: MetricCar
 
       {/* Middle: current value */}
       <div className="flex items-baseline gap-1 mb-3">
-        <span className="text-2xl font-mono font-bold text-zinc-100">
+        <span className="text-2xl font-mono font-bold tabular-nums">
           {displayValue}
         </span>
         {displayUnit && (
-          <span className="text-sm text-zinc-500">{displayUnit}</span>
+          <span className="text-sm text-muted-foreground">{displayUnit}</span>
         )}
       </div>
 

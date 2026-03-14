@@ -51,7 +51,7 @@ export function ExportButton({
           variant="outline"
           size="sm"
           disabled={disabled}
-          className="flex items-center gap-1.5"
+          className="flex items-center gap-1.5 h-7 text-xs"
         >
           <Download className="size-3.5" />
           Export
@@ -62,7 +62,7 @@ export function ExportButton({
           <button
             type="button"
             onClick={handleJson}
-            className="w-full rounded px-3 py-2 text-sm text-left hover:bg-zinc-800 transition-colors"
+            className="w-full rounded-md px-3 py-2 text-sm text-left hover:bg-accent transition-colors"
           >
             Export as JSON
           </button>
@@ -70,10 +70,10 @@ export function ExportButton({
             type="button"
             onClick={handleCsv}
             disabled={!hasCsvRows}
-            className={`w-full rounded px-3 py-2 text-sm text-left transition-colors ${
+            className={`w-full rounded-md px-3 py-2 text-sm text-left transition-colors ${
               hasCsvRows
-                ? 'hover:bg-zinc-800'
-                : 'text-zinc-500 cursor-not-allowed'
+                ? 'hover:bg-accent'
+                : 'text-muted-foreground cursor-not-allowed'
             }`}
           >
             Export as CSV

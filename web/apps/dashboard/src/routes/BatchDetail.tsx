@@ -29,7 +29,7 @@ export default function BatchDetail() {
 
   if (loading && !batch) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="p-6 space-y-4 max-w-6xl mx-auto">
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-3 w-full" />
         <Skeleton className="h-20 w-full" />
@@ -44,8 +44,8 @@ export default function BatchDetail() {
 
   if (error && !batch) {
     return (
-      <div className="p-6">
-        <p className="text-sm text-red-400">Error: {error}</p>
+      <div className="p-6 max-w-6xl mx-auto">
+        <p className="text-sm text-destructive">Error: {error}</p>
       </div>
     )
   }
@@ -109,15 +109,15 @@ export default function BatchDetail() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 max-w-6xl mx-auto">
       {/* Breadcrumb + export */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <nav className="text-sm text-zinc-500">
-          <Link to="/runs" className="hover:text-zinc-300 transition-colors">
+        <nav className="text-sm text-muted-foreground">
+          <Link to="/runs" className="hover:text-foreground transition-colors">
             Batches
           </Link>
-          <span className="mx-1">/</span>
-          <span className="text-zinc-200 font-mono">{batch.batch_id}</span>
+          <span className="mx-1.5 text-border">/</span>
+          <span className="text-foreground font-mono">{batch.batch_id}</span>
         </nav>
         <ExportButton
           data={batch}
@@ -141,11 +141,10 @@ export default function BatchDetail() {
           </div>
 
           {/* Live cost counter */}
-          <div className="rounded bg-zinc-800 px-3 py-2 shrink-0">
-            <div className="text-[10px] uppercase tracking-wide text-zinc-500">Cost</div>
+          <div className="rounded-lg border border-border/50 bg-card/50 px-3 py-2 shrink-0">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Cost</div>
             <div
-              className="text-lg font-mono font-bold text-zinc-100"
-              style={{ fontVariantNumeric: 'tabular-nums' }}
+              className="text-lg font-mono font-bold tabular-nums"
             >
               {costLabel}
             </div>
@@ -163,25 +162,25 @@ export default function BatchDetail() {
 
       {/* Completion summary (only shown when batch is complete) */}
       {isComplete && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 space-y-2">
-          <h3 className="text-sm font-semibold text-zinc-200">Completion Summary</h3>
+        <div className="rounded-lg border border-border/50 bg-card/50 p-4 space-y-2">
+          <h3 className="text-sm font-medium">Completion Summary</h3>
           <div className="flex flex-wrap gap-4 text-sm">
-            <span className="text-zinc-400">
+            <span className="text-muted-foreground">
               Pass rate:{' '}
-              <span className="text-zinc-100 font-mono">
+              <span className="text-foreground font-mono tabular-nums">
                 {(batch.pass_rate * 100).toFixed(1)}%
               </span>
             </span>
-            <span className="text-zinc-400">
+            <span className="text-muted-foreground">
               Cost:{' '}
-              <span className="text-zinc-100 font-mono">{costLabel}</span>
+              <span className="text-foreground font-mono tabular-nums">{costLabel}</span>
             </span>
           </div>
           {worstTasks.length > 0 && (
-            <div className="text-sm text-zinc-400">
-              <span className="text-zinc-500">Highest error tasks: </span>
+            <div className="text-sm text-muted-foreground">
+              <span>Highest error tasks: </span>
               {worstTasks.map(([name, count]) => (
-                <span key={name} className="font-mono text-zinc-300 mr-2">
+                <span key={name} className="font-mono text-foreground mr-2">
                   {name} ({count})
                 </span>
               ))}
@@ -200,7 +199,7 @@ export default function BatchDetail() {
 
         <TabsContent value="tasks" className="mt-4">
           {batch.task_results.length === 0 ? (
-            <p className="text-sm text-zinc-500 py-4">No task results yet.</p>
+            <p className="text-sm text-muted-foreground py-4">No task results yet.</p>
           ) : (
             <BatchTaskList
               taskResults={batch.task_results}

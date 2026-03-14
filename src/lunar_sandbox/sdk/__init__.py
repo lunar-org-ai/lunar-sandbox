@@ -17,6 +17,7 @@ Public API::
 from lunar_sandbox.sdk.agent_wrapper import CallableAgentAdapter, normalize_agent
 from lunar_sandbox.sdk.config import EngineConfig
 from lunar_sandbox.sdk.engine import LunarEngine
+from lunar_sandbox.sdk.session import Session, anthropic_adapter, openai_adapter
 
 # Convenience functions are imported lazily to avoid circular imports
 # during module initialization -- they depend on LunarEngine which is
@@ -32,7 +33,10 @@ __all__ = [
     "CallableAgentAdapter",
     "EngineConfig",
     "LunarEngine",
+    "Session",
+    "anthropic_adapter",
     "normalize_agent",
+    "openai_adapter",
     "run_batch",
     "run_batch_sync",
     "run_task",

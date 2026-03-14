@@ -82,6 +82,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
   useEffect(() => {
     let disposed = false
+    let connectTimer: ReturnType<typeof setTimeout> | null = null
 
     function connect() {
       if (disposed) return
@@ -89,6 +90,17 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       setReadyState((prev) =>
         prev === 'reconnecting' ? 'reconnecting' : 'connecting',
       )
+
+      // Delay connection slightly to avoid StrictMode double-mount noise
+      connectTimer = setTimeout(() => {
+        connectTimer = null
+        if (disposed) return
+        _doConnect()
+      }, 50)
+    }
+
+    function _doConnect() {
+      if (disposed) return
 
       const ws = new WebSocket(url)
       wsRef.current = ws
@@ -151,6 +163,11 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
     return () => {
       disposed = true
+
+      if (connectTimer !== null) {
+        clearTimeout(connectTimer)
+        connectTimer = null
+      }
 
       if (reconnectTimerRef.current !== null) {
         clearTimeout(reconnectTimerRef.current)

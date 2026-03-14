@@ -13,3 +13,13 @@ node_modules/
 web/apps/dashboard/dist/
 .env
 .env.local
+
+# Runtime data
+trajectories/
+*.db
+*.db-shm
+*.db-wal
+
+# Test notebooks (may contain API keys)
+test_total.ipynb
+usecase_real.ipynb

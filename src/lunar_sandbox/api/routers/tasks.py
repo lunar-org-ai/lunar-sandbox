@@ -1,8 +1,7 @@
-"""Task listing endpoints.
+"""Task listing and registration endpoints.
 
-Tasks are defined in YAML files, not stored in a database.  For Phase 8,
-this router queries the trajectory store for distinct task names from
-completed episodes, providing a "tasks that have been run" endpoint.
+Tasks can be registered via POST and listed via GET.  The GET endpoint
+reads from the ``tasks`` table in the trajectory store.
 """
 
 from __future__ import annotations
@@ -21,23 +20,13 @@ async def list_tasks(
     pagination: PaginationParams = Depends(pagination_query),
     engine=Depends(get_engine),
 ) -> PaginatedTasks:
-    """List tasks that have been evaluated (from episode history)."""
+    """List registered tasks."""
     store = engine.trajectory_store
     if store is None:
         raise HTTPException(status_code=503, detail="Trajectory store not available")
 
-    # Get distinct task names from episodes
-    all_episodes = store.query_episodes()
-    task_names: dict[str, int] = {}
-    for ep in all_episodes:
-        name = ep.get("task_name", "")
-        task_names[name] = task_names.get(name, 0) + 1
-
-    # Build task summaries sorted by name
-    tasks = sorted(
-        [TaskSummary(name=name) for name in task_names],
-        key=lambda t: t.name,
-    )
+    all_tasks = store.list_tasks()
+    tasks = [TaskSummary(**t) for t in all_tasks]
 
     total = len(tasks)
     page = tasks[pagination.offset : pagination.offset + pagination.limit]
@@ -50,21 +39,50 @@ async def list_tasks(
     )
 
 
+@router.post("", response_model=TaskSummary, status_code=201)
+async def create_task(
+    body: TaskSummary,
+    engine=Depends(get_engine),
+) -> TaskSummary:
+    """Register a new task definition."""
+    store = engine.trajectory_store
+    if store is None:
+        raise HTTPException(status_code=503, detail="Trajectory store not available")
+
+    if not body.name:
+        raise HTTPException(status_code=422, detail="Task name is required")
+
+    store.register_task(body.model_dump())
+    return body
+
+
 @router.get("/{task_name}", response_model=TaskSummary)
 async def get_task(
     task_name: str,
     engine=Depends(get_engine),
 ) -> TaskSummary:
-    """Get task info by name (from episode history)."""
+    """Get a task by name."""
     store = engine.trajectory_store
     if store is None:
         raise HTTPException(status_code=503, detail="Trajectory store not available")
 
-    episodes = store.query_episodes(task_name=task_name)
-    if not episodes:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No episodes found for task '{task_name}'",
-        )
+    all_tasks = store.list_tasks()
+    for t in all_tasks:
+        if t["name"] == task_name:
+            return TaskSummary(**t)
 
-    return TaskSummary(name=task_name)
+    raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")
+
+
+@router.delete("/{task_name}", status_code=204)
+async def delete_task(
+    task_name: str,
+    engine=Depends(get_engine),
+) -> None:
+    """Delete a registered task."""
+    store = engine.trajectory_store
+    if store is None:
+        raise HTTPException(status_code=503, detail="Trajectory store not available")
+
+    if not store.delete_task(task_name):
+        raise HTTPException(status_code=404, detail=f"Task '{task_name}' not found")

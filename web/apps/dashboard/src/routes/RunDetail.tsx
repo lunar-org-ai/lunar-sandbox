@@ -16,6 +16,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ExportButton } from '@/components/ExportButton'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -62,8 +63,8 @@ interface MetricProps {
 function Metric({ label, value }: MetricProps) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-xs text-neutral-400 uppercase tracking-wider">{label}</span>
-      <span className="text-lg font-semibold">{value}</span>
+      <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{label}</span>
+      <span className="text-lg font-semibold tabular-nums">{value}</span>
     </div>
   )
 }
@@ -88,16 +89,45 @@ export default function RunDetail() {
 
   useEffect(() => {
     if (!episodeId) return
+    let cancelled = false
+
+    function load() {
+      fetchEpisode(episodeId!)
+        .then((data) => {
+          if (cancelled) return
+          setEpisode(data)
+          setLoading(false)
+        })
+        .catch((e: Error) => {
+          if (cancelled) return
+          setFetchError(e.message.includes('404') ? 'Run not found.' : e.message)
+          setLoading(false)
+        })
+    }
+
     setLoading(true)
-    fetchEpisode(episodeId)
-      .then((data) => {
-        setEpisode(data)
-        setLoading(false)
-      })
-      .catch((e: Error) => {
-        setFetchError(e.message.includes('404') ? 'Run not found.' : e.message)
-        setLoading(false)
-      })
+    load()
+
+    // Poll every 2s while episode is not terminal
+    const interval = setInterval(() => {
+      if (cancelled) return
+      // Re-fetch if not yet complete
+      fetchEpisode(episodeId!)
+        .then((data) => {
+          if (cancelled) return
+          setEpisode(data)
+          // Stop polling when episode is terminal
+          if (data.is_complete === 1) {
+            clearInterval(interval)
+          }
+        })
+        .catch(() => {})
+    }, 2000)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
   }, [episodeId])
 
   // Escape key closes the detail panel
@@ -141,12 +171,12 @@ export default function RunDetail() {
       <div className="max-w-6xl mx-auto p-8 space-y-4">
         <Link
           to="/runs"
-          className="inline-flex items-center gap-1 text-sm text-neutral-400 hover:text-neutral-200"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="size-4" />
           Runs
         </Link>
-        <p className="text-red-400 text-sm">{fetchError}</p>
+        <p className="text-destructive text-sm">{fetchError}</p>
       </div>
     )
   }
@@ -197,6 +227,8 @@ function RunDetailContent({
     episodeStartTs: episode.started_at,
   })
 
+  const isRunning = episode.is_complete !== 1
+
   // --- View mode state (synced with ?view= search param) ---
   const [searchParams, setSearchParams] = useSearchParams()
   const viewParam = searchParams.get('view')
@@ -232,36 +264,35 @@ function RunDetailContent({
   return (
     <div className="max-w-6xl mx-auto p-8 space-y-6">
       {/* Breadcrumb / back navigation */}
-      <div className="flex items-center gap-2 text-sm text-neutral-400">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Link
           to="/runs"
-          className="inline-flex items-center gap-1 hover:text-neutral-200 transition-colors"
+          className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
         >
           <ArrowLeft className="size-4" />
           Runs
         </Link>
-        <span>/</span>
-        <span className="font-mono text-neutral-300 text-xs truncate max-w-xs">{episodeId}</span>
+        <span className="text-border">/</span>
+        <span className="font-mono text-foreground/80 text-xs truncate max-w-xs">{episodeId}</span>
       </div>
 
       {/* Outcome Summary Card */}
-      <Card>
+      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
         <CardHeader>
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 flex-wrap">
               <StatusBadge status={episode.outcome} type="outcome" />
-              <span className="font-mono text-sm text-neutral-300 break-all">{episode.episode_id}</span>
-              <span className="text-sm text-neutral-400">{episode.task_name}</span>
+              <span className="font-mono text-sm text-muted-foreground break-all">{episode.episode_id}</span>
+              <span className="text-sm text-muted-foreground">{episode.task_name}</span>
             </div>
             <div className="flex items-center gap-2">
               {episode.ended_at != null && (
-                <Link
-                  to={`/replay/${episodeId}`}
-                  className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 border border-zinc-700 transition-colors"
-                >
-                  <RotateCcw className="size-3.5" />
-                  Replay
-                </Link>
+                <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
+                  <Link to={`/replay/${episodeId}`}>
+                    <RotateCcw className="size-3 mr-1.5" />
+                    Replay
+                  </Link>
+                </Button>
               )}
               <ExportButton
                 data={episode}
@@ -308,20 +339,20 @@ function RunDetailContent({
       </Card>
 
       {/* Trace Timeline + Detail Panel */}
-      <Card className="overflow-hidden rounded-lg border border-zinc-800 p-0">
-        <CardHeader className="border-b border-zinc-800 px-4 py-3">
+      <Card className="overflow-hidden border-border/50 p-0">
+        <CardHeader className="border-b border-border/50 px-4 py-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium text-zinc-300">{cardTitle}</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{cardTitle}</CardTitle>
             {/* View mode toggle */}
-            <div className="flex gap-1 bg-zinc-800 rounded-md p-0.5">
+            <div className="flex gap-0.5 bg-muted rounded-md p-0.5">
               <button
                 type="button"
                 title="Timeline (1)"
                 onClick={() => setViewModeAndParam('timeline')}
-                className={`px-2 py-1 rounded text-xs transition-colors ${
+                className={`px-2 py-1 rounded-sm text-xs transition-colors ${
                   viewMode === 'timeline'
-                    ? 'bg-zinc-700 text-zinc-200'
-                    : 'text-zinc-500 hover:text-zinc-300'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <List className="size-3.5" />
@@ -330,10 +361,10 @@ function RunDetailContent({
                 type="button"
                 title="Graph (2)"
                 onClick={() => setViewModeAndParam('graph')}
-                className={`px-2 py-1 rounded text-xs transition-colors ${
+                className={`px-2 py-1 rounded-sm text-xs transition-colors ${
                   viewMode === 'graph'
-                    ? 'bg-zinc-700 text-zinc-200'
-                    : 'text-zinc-500 hover:text-zinc-300'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <GitBranch className="size-3.5" />
@@ -342,10 +373,10 @@ function RunDetailContent({
                 type="button"
                 title="Split view (3)"
                 onClick={() => setViewModeAndParam('split')}
-                className={`px-2 py-1 rounded text-xs transition-colors ${
+                className={`px-2 py-1 rounded-sm text-xs transition-colors ${
                   viewMode === 'split'
-                    ? 'bg-zinc-700 text-zinc-200'
-                    : 'text-zinc-500 hover:text-zinc-300'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <LayoutGrid className="size-3.5" />
@@ -364,6 +395,7 @@ function RunDetailContent({
                 <TraceTimeline
                   spans={spans}
                   isLive={isLive}
+                  isRunning={isRunning}
                   totalSpans={totalSpans}
                   onSpanSelect={setSelectedSpan}
                   selectedSpanId={selectedSpan?.id ?? null}
@@ -383,6 +415,7 @@ function RunDetailContent({
                     <TraceTimeline
                       spans={spans}
                       isLive={isLive}
+                      isRunning={isRunning}
                       totalSpans={totalSpans}
                       onSpanSelect={setSelectedSpan}
                       selectedSpanId={selectedSpan?.id ?? null}
@@ -414,10 +447,10 @@ function RunDetailContent({
             >
               {selectedSpan && (
                 <div className="flex flex-col h-full overflow-hidden">
-                  <div className="shrink-0 flex items-center justify-end px-3 py-1 bg-zinc-900 border-b border-zinc-800">
+                  <div className="shrink-0 flex items-center justify-end px-3 py-1 bg-muted/50 border-b border-border/50">
                     <Link
                       to={`/replay/${episodeId}?step=${selectedSpan.stepIdx}`}
-                      className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                     >
                       Open in Replay
                     </Link>

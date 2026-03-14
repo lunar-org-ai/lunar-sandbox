@@ -240,7 +240,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                   >
                     <Square className="size-4 text-red-400" />
                     <span className="font-mono text-xs">{s.sandbox_id}</span>
-                    <span className="text-xs text-zinc-500 ml-2">{s.fingerprint?.slice(0, 12)}</span>
+                    <span className="text-xs text-muted-foreground ml-2">{s.fingerprint?.slice(0, 12)}</span>
                   </CommandItem>
                 ))}
             </CommandGroup>
@@ -253,7 +253,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 setQuery('')
               }}
             >
-              <span className="text-xs text-zinc-500">Back to commands</span>
+              <span className="text-xs text-muted-foreground">Back to commands</span>
             </CommandItem>
           </CommandGroup>
         </CommandList>
@@ -370,7 +370,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 >
                   <Play className="size-4" />
                   <span className="font-mono text-xs truncate max-w-[200px]">{ep.episode_id}</span>
-                  <span className="text-xs text-zinc-500 ml-1">{ep.task_name}</span>
+                  <span className="text-xs text-muted-foreground ml-1">{ep.task_name}</span>
                 </CommandItem>
               ))}
 
@@ -382,7 +382,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 >
                   <List className="size-4" />
                   <span className="font-mono text-xs truncate max-w-[200px]">{b.run_id}</span>
-                  <span className="text-xs text-zinc-500 ml-1">{b.task_name}</span>
+                  <span className="text-xs text-muted-foreground ml-1">{b.task_name}</span>
                 </CommandItem>
               ))}
 

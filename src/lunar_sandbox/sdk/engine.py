@@ -86,6 +86,10 @@ class LunarEngine:
         :class:`TrajectoryStore` with configs derived from
         :class:`EngineConfig`.  Starts the pool background tasks.
 
+        When ``sandbox_backend`` is ``"docker"`` or ``"auto"`` (with
+        native unavailable), the pool uses Docker containers instead
+        of Linux kernel primitives.
+
         Safe to call multiple times; subsequent calls are no-ops.
         """
         if self._started:
@@ -101,7 +105,12 @@ class LunarEngine:
         self._telemetry = TelemetryCollector()
 
         pool_config = self._make_pool_config()
-        self._pool = SandboxPool(pool_config, telemetry_collector=self._telemetry)
+        sandbox_factory = self._resolve_sandbox_factory()
+        self._pool = SandboxPool(
+            pool_config,
+            sandbox_factory=sandbox_factory,
+            telemetry_collector=self._telemetry,
+        )
         await self._pool.start()
 
         batch_config = self._make_batch_config()
@@ -470,6 +479,68 @@ class LunarEngine:
             trajectory_dir=self._config.trajectory_dir,
             results_dir=self._config.results_dir,
         )
+
+    def _resolve_sandbox_factory(self) -> Callable[..., object] | None:
+        """Resolve which sandbox factory to use based on config.
+
+        Returns:
+            A sandbox factory callable for Docker, or None for native default.
+        """
+        backend = self._config.sandbox_backend
+
+        if backend == "docker":
+            return self._make_docker_factory()
+
+        if backend == "native":
+            return None  # Pool uses default native factory
+
+        # "auto": try native, fall back to Docker
+        try:
+            from lunar_sandbox.kernel.detect import require_kernel_features
+
+            require_kernel_features()
+            return None  # Native works
+        except Exception:
+            return self._make_docker_factory()
+
+    def _make_docker_factory(self) -> Callable[..., object]:
+        """Create a Docker sandbox factory callable for the pool."""
+        import structlog
+
+        from lunar_sandbox.sandbox.docker_config import (
+            DockerResourceLimits,
+            DockerSandboxConfig,
+        )
+        from lunar_sandbox.sandbox.docker_sandbox import DockerSandbox
+
+        _log = structlog.get_logger(__name__)
+
+        image = self._config.docker_image
+        # For Docker, use a user-writable directory instead of /var/lib/...
+        data_root_str = self._config.data_root
+        data_root_path = Path(data_root_str) if isinstance(data_root_str, str) else data_root_str
+        if str(data_root_path).startswith("/var/lib"):
+            data_root_path = Path.home() / ".lunar-sandbox" / "containers"
+
+        def factory(fingerprint: str) -> DockerSandbox:
+            from uuid import uuid4
+
+            sandbox_id = f"lunar-{uuid4().hex[:8]}"
+            config = DockerSandboxConfig(
+                sandbox_id=sandbox_id,
+                image=image,
+                data_root=data_root_path,
+            )
+            sandbox = DockerSandbox(config)
+            sandbox.create()
+            _log.info(
+                "docker_sandbox_created_by_factory",
+                sandbox_id=sandbox_id,
+                fingerprint=fingerprint,
+            )
+            return sandbox
+
+        return factory
 
     def _resolve_task(self, task: TaskDefinition | str | Path) -> TaskDefinition:
         """Resolve a task argument to a :class:`TaskDefinition`.

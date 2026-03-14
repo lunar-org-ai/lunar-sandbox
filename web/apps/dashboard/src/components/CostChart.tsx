@@ -58,20 +58,19 @@ export function CostChart({ data, inputTokens, outputTokens, totalCost }: CostCh
       <div className="flex flex-wrap items-baseline gap-6">
         {/* Running cost counter */}
         <div
-          className="text-3xl font-mono font-bold text-zinc-100"
-          style={{ fontVariantNumeric: 'tabular-nums' }}
+          className="text-3xl font-mono font-bold tabular-nums"
         >
           {USD_FORMATTER.format(totalCost)}
         </div>
 
         {/* Token breakdown */}
-        <div className="text-sm text-zinc-400">
+        <div className="text-sm text-muted-foreground">
           Input:{' '}
-          <span className="text-zinc-200 font-mono">
+          <span className="text-foreground font-mono tabular-nums">
             {inputTokens.toLocaleString()}
           </span>{' '}
           tokens | Output:{' '}
-          <span className="text-zinc-200 font-mono">
+          <span className="text-foreground font-mono tabular-nums">
             {outputTokens.toLocaleString()}
           </span>{' '}
           tokens
@@ -80,8 +79,8 @@ export function CostChart({ data, inputTokens, outputTokens, totalCost }: CostCh
 
       {/* Chart or placeholder */}
       {data.length === 0 ? (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6 text-center h-[240px] flex items-center justify-center">
-          <p className="text-sm text-zinc-500">
+        <div className="rounded-lg border border-border/50 bg-card/50 p-6 text-center h-[240px] flex items-center justify-center">
+          <p className="text-sm text-muted-foreground">
             Cost data will appear as episodes complete
           </p>
         </div>
@@ -91,29 +90,29 @@ export function CostChart({ data, inputTokens, outputTokens, totalCost }: CostCh
             <XAxis
               dataKey="elapsed_s"
               tickFormatter={formatMinutes}
-              stroke="#52525b"
-              tick={{ fill: '#a1a1aa', fontSize: 11 }}
+              stroke="hsl(0 0% 20%)"
+              tick={{ fill: 'hsl(0 0% 55%)', fontSize: 11 }}
             />
             <YAxis
               tickFormatter={formatUsdAxis}
-              stroke="#52525b"
-              tick={{ fill: '#a1a1aa', fontSize: 11 }}
+              stroke="hsl(0 0% 20%)"
+              tick={{ fill: 'hsl(0 0% 55%)', fontSize: 11 }}
               width={55}
             />
             <Tooltip
               formatter={(value) => [formatUsdTooltip(typeof value === 'number' ? value : 0), 'Cost']}
               contentStyle={{
-                background: '#18181b',
-                border: '1px solid #3f3f46',
-                borderRadius: '0.375rem',
+                background: 'hsl(0 0% 7%)',
+                border: '1px solid hsl(0 0% 15%)',
+                borderRadius: '0.5rem',
               }}
-              labelStyle={{ color: '#a1a1aa' }}
+              labelStyle={{ color: 'hsl(0 0% 55%)' }}
             />
             <Line
               type="monotone"
               dataKey="cumulative_usd"
-              stroke="#22d3ee"
-              strokeWidth={2}
+              stroke="hsl(0 0% 93%)"
+              strokeWidth={1.5}
               dot={false}
             />
           </LineChart>

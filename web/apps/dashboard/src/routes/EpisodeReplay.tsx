@@ -42,15 +42,15 @@ function statusIcon(status: TraceSpan['status']): string {
   switch (status) {
     case 'success':
     case 'completed':
-      return '✓'
+      return '\u2713'
     case 'error':
-      return '✗'
+      return '\u2717'
     case 'timeout':
-      return '⏱'
+      return '\u23F1'
     case 'running':
-      return '…'
+      return '\u2026'
     default:
-      return '·'
+      return '\u00B7'
   }
 }
 
@@ -58,15 +58,15 @@ function statusColor(status: TraceSpan['status']): string {
   switch (status) {
     case 'success':
     case 'completed':
-      return 'text-green-400'
+      return 'text-emerald-400'
     case 'error':
       return 'text-red-400'
     case 'timeout':
-      return 'text-orange-400'
+      return 'text-amber-400'
     case 'running':
       return 'text-blue-400'
     default:
-      return 'text-zinc-400'
+      return 'text-muted-foreground'
   }
 }
 
@@ -116,15 +116,15 @@ function StepList({ spans, currentStep, onSelect }: StepListProps) {
 
   if (spans.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-xs text-zinc-500">
+      <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
         No steps
       </div>
     )
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-zinc-900">
-      <div className="px-2 py-2 text-[10px] uppercase tracking-wider text-zinc-500 font-semibold border-b border-zinc-800">
+    <div className="h-full overflow-y-auto bg-background">
+      <div className="px-3 py-2.5 text-[11px] uppercase tracking-wider text-muted-foreground font-medium border-b border-border/50">
         Steps ({spans.length})
       </div>
       {spans.map((span, idx) => {
@@ -137,12 +137,12 @@ function StepList({ spans, currentStep, onSelect }: StepListProps) {
             type="button"
             onClick={() => onSelect(idx)}
             className={cn(
-              'w-full text-left px-3 py-2 flex items-start gap-2 hover:bg-zinc-800/60 transition-colors border-b border-zinc-800/50',
-              isSelected && 'bg-zinc-800',
+              'w-full text-left px-3 py-2 flex items-start gap-2 hover:bg-accent/50 transition-colors border-b border-border/30',
+              isSelected && 'bg-accent',
             )}
           >
             {/* Step number */}
-            <span className="shrink-0 text-[10px] font-mono text-zinc-500 w-5 pt-0.5 text-right">
+            <span className="shrink-0 text-[10px] font-mono text-muted-foreground w-5 pt-0.5 text-right tabular-nums">
               {idx + 1}
             </span>
 
@@ -156,10 +156,10 @@ function StepList({ spans, currentStep, onSelect }: StepListProps) {
 
             {/* Action + duration */}
             <div className="flex-1 min-w-0">
-              <span className="block text-xs font-mono text-zinc-200 truncate">
+              <span className="block text-xs font-mono text-foreground truncate">
                 {span.action}
               </span>
-              <span className="block text-[10px] text-zinc-500 mt-0.5">
+              <span className="block text-[10px] text-muted-foreground mt-0.5">
                 {formatDurationMs(span.durationMs)}
               </span>
             </div>
@@ -195,23 +195,23 @@ function StatePanel({ span }: StatePanelProps) {
 
   return (
     <Tabs defaultValue="io" className="flex flex-col h-full">
-      <TabsList className="shrink-0 w-full rounded-none border-b border-zinc-800 bg-zinc-900 justify-start gap-0 px-3 py-0 h-9">
+      <TabsList className="shrink-0 w-full rounded-none border-b border-border/50 bg-background justify-start gap-0 px-3 py-0 h-9">
         <TabsTrigger
           value="io"
-          className="rounded-none h-full px-3 text-xs data-[state=active]:border-b-2 data-[state=active]:border-blue-400 data-[state=active]:bg-transparent"
+          className="rounded-none h-full px-3 text-xs data-[state=active]:border-b-2 data-[state=active]:border-foreground data-[state=active]:bg-transparent"
         >
           I/O
         </TabsTrigger>
         <TabsTrigger
           value="diffs"
-          className="rounded-none h-full px-3 text-xs data-[state=active]:border-b-2 data-[state=active]:border-blue-400 data-[state=active]:bg-transparent"
+          className="rounded-none h-full px-3 text-xs data-[state=active]:border-b-2 data-[state=active]:border-foreground data-[state=active]:bg-transparent"
         >
           {diffCount > 0 ? `Diffs (${diffCount})` : 'Diffs'}
         </TabsTrigger>
         {screenshot && (
           <TabsTrigger
             value="screenshot"
-            className="rounded-none h-full px-3 text-xs data-[state=active]:border-b-2 data-[state=active]:border-blue-400 data-[state=active]:bg-transparent"
+            className="rounded-none h-full px-3 text-xs data-[state=active]:border-b-2 data-[state=active]:border-foreground data-[state=active]:bg-transparent"
           >
             Screenshot
           </TabsTrigger>
@@ -223,19 +223,19 @@ function StatePanel({ span }: StatePanelProps) {
         <div className="space-y-4">
           {/* Timing */}
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-1.5">
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">
               Timing
             </p>
             <div className="flex gap-3 text-xs">
-              <span className="text-zinc-400">
+              <span className="text-muted-foreground">
                 Start:{' '}
-                <span className="font-mono text-zinc-200">
+                <span className="font-mono text-foreground tabular-nums">
                   {formatDurationMs(span.startMs)}
                 </span>
               </span>
-              <span className="text-zinc-400">
+              <span className="text-muted-foreground">
                 Duration:{' '}
-                <span className="font-mono text-zinc-200">
+                <span className="font-mono text-foreground tabular-nums">
                   {formatDurationMs(span.durationMs)}
                 </span>
               </span>
@@ -244,20 +244,20 @@ function StatePanel({ span }: StatePanelProps) {
 
           {/* Input */}
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-1.5">
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">
               Input
             </p>
-            <pre className="text-xs font-mono bg-zinc-950 text-zinc-300 p-3 rounded border border-zinc-800 overflow-auto max-h-60 whitespace-pre-wrap break-words">
+            <pre className="text-xs font-mono bg-muted/50 text-foreground/80 p-3 rounded-md border border-border/50 overflow-auto max-h-60 whitespace-pre-wrap break-words">
               {JSON.stringify(span.params, null, 2)}
             </pre>
           </div>
 
           {/* Output */}
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold mb-1.5">
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">
               Output
             </p>
-            <pre className="text-xs font-mono bg-zinc-950 text-zinc-300 p-3 rounded border border-zinc-800 overflow-auto max-h-60 whitespace-pre-wrap break-words">
+            <pre className="text-xs font-mono bg-muted/50 text-foreground/80 p-3 rounded-md border border-border/50 overflow-auto max-h-60 whitespace-pre-wrap break-words">
               {JSON.stringify(span.observation, null, 2)}
             </pre>
           </div>
@@ -277,7 +277,7 @@ function StatePanel({ span }: StatePanelProps) {
           <img
             src={screenshot.startsWith('data:') ? screenshot : `data:image/png;base64,${screenshot}`}
             alt={`Step ${span.stepIdx + 1} screenshot`}
-            className="max-w-full rounded border border-zinc-800"
+            className="max-w-full rounded-md border border-border/50"
           />
         </TabsContent>
       )}
@@ -321,17 +321,17 @@ function PlaybackControls({
   onScrub,
 }: PlaybackControlsProps) {
   return (
-    <div className="shrink-0 flex flex-col gap-2 bg-zinc-900 border-b border-zinc-800 px-4 py-2">
+    <div className="shrink-0 flex flex-col gap-2 bg-background border-b border-border/50 px-4 py-2.5">
       {/* Controls row */}
       <div className="flex items-center gap-3">
         {/* Playback buttons */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <button
             type="button"
             title="First step"
             onClick={onFirst}
             disabled={currentStep === 0}
-            className="p-1.5 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             <SkipBack className="size-3.5" />
           </button>
@@ -340,7 +340,7 @@ function PlaybackControls({
             title="Previous step"
             onClick={onPrev}
             disabled={currentStep === 0}
-            className="p-1.5 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronLeft className="size-3.5" />
           </button>
@@ -349,7 +349,7 @@ function PlaybackControls({
             title={playing ? 'Pause' : 'Play'}
             onClick={playing ? onPause : onPlay}
             disabled={totalSteps === 0}
-            className="p-1.5 rounded bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="p-1.5 rounded-md bg-foreground text-background hover:bg-foreground/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
           </button>
@@ -358,7 +358,7 @@ function PlaybackControls({
             title="Next step"
             onClick={onNext}
             disabled={currentStep >= totalSteps - 1}
-            className="p-1.5 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronRight className="size-3.5" />
           </button>
@@ -367,29 +367,29 @@ function PlaybackControls({
             title="Last step"
             onClick={onLast}
             disabled={currentStep >= totalSteps - 1}
-            className="p-1.5 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             <SkipForward className="size-3.5" />
           </button>
         </div>
 
         {/* Step counter */}
-        <span className="text-xs text-zinc-400 font-mono whitespace-nowrap">
+        <span className="text-xs text-muted-foreground font-mono whitespace-nowrap tabular-nums">
           {totalSteps > 0 ? `${currentStep + 1} / ${totalSteps}` : '0 / 0'}
         </span>
 
         {/* Speed selector */}
-        <div className="ml-auto flex items-center gap-1 bg-zinc-800 rounded-md p-0.5">
+        <div className="ml-auto flex items-center gap-0.5 bg-muted rounded-md p-0.5">
           {SPEEDS.map((s) => (
             <button
               key={s}
               type="button"
               onClick={() => onSpeedChange(s)}
               className={cn(
-                'px-2 py-0.5 rounded text-xs transition-colors',
+                'px-2 py-0.5 rounded-sm text-xs transition-colors',
                 speed === s
-                  ? 'bg-zinc-700 text-zinc-200'
-                  : 'text-zinc-500 hover:text-zinc-300',
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
               )}
             >
               {s}x
@@ -405,7 +405,7 @@ function PlaybackControls({
         max={Math.max(0, totalSteps - 1)}
         value={currentStep}
         onChange={(e) => onScrub(Number(e.target.value))}
-        className="w-full h-1.5 accent-blue-500 cursor-pointer"
+        className="w-full h-1.5 accent-foreground cursor-pointer"
         disabled={totalSteps === 0}
       />
     </div>
@@ -607,13 +607,13 @@ export default function EpisodeReplay() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-screen bg-neutral-950">
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800 bg-zinc-900">
+      <div className="flex flex-col h-screen bg-background">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border/50">
           <Skeleton className="h-5 w-20" />
           <Skeleton className="h-5 w-48" />
         </div>
         <div className="flex flex-1 overflow-hidden">
-          <div className="w-64 border-r border-zinc-800 p-3 space-y-2">
+          <div className="w-64 border-r border-border/50 p-3 space-y-2">
             {Array.from({ length: 8 }).map((_, i) => (
               <Skeleton key={i} className="h-10 w-full" />
             ))}
@@ -630,18 +630,18 @@ export default function EpisodeReplay() {
 
   if (fetchError) {
     return (
-      <div className="flex flex-col h-screen bg-neutral-950">
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800 bg-zinc-900">
+      <div className="flex flex-col h-screen bg-background">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border/50">
           <Link
             to={`/runs/${episodeId}`}
-            className="inline-flex items-center gap-1 text-sm text-neutral-400 hover:text-neutral-200"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="size-4" />
             Back
           </Link>
         </div>
         <div className="flex items-center justify-center flex-1">
-          <p className="text-red-400 text-sm">{fetchError}</p>
+          <p className="text-destructive text-sm">{fetchError}</p>
         </div>
       </div>
     )
@@ -652,32 +652,32 @@ export default function EpisodeReplay() {
   const currentSpan = spans[currentStep] ?? null
 
   return (
-    <div className="flex flex-col h-screen bg-neutral-950 overflow-hidden">
+    <div className="flex flex-col h-screen bg-background overflow-hidden">
       {/* ------------------------------------------------------------------ */}
       {/* Header bar                                                          */}
       {/* ------------------------------------------------------------------ */}
-      <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-zinc-800 bg-zinc-900 min-w-0">
+      <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-border/50 min-w-0">
         <Link
           to={`/runs/${episodeId}`}
-          className="shrink-0 inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+          className="shrink-0 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="size-4" />
           Back
         </Link>
 
-        <span className="text-zinc-700">|</span>
+        <span className="text-border">|</span>
 
-        <span className="text-xs font-mono text-zinc-300 truncate min-w-0">
+        <span className="text-xs font-mono text-foreground/80 truncate min-w-0">
           {episodeId}
         </span>
 
         {episode.task_name && (
-          <span className="hidden sm:block text-xs text-zinc-500 truncate">
+          <span className="hidden sm:block text-xs text-muted-foreground truncate">
             {episode.task_name}
           </span>
         )}
 
-        <span className="ml-auto text-[10px] text-zinc-600 font-mono hidden md:block">
+        <span className="ml-auto text-[10px] text-muted-foreground/50 font-mono hidden md:block">
           Space: play/pause &nbsp;|&nbsp; &larr;&rarr; / j k: step &nbsp;|&nbsp; Home/End: first/last
         </span>
       </div>
@@ -737,7 +737,7 @@ export default function EpisodeReplay() {
                     episodeId={episodeId}
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-xs text-zinc-500">
+                  <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
                     {spans.length === 0 ? 'No steps in this episode.' : 'Select a step'}
                   </div>
                 )}

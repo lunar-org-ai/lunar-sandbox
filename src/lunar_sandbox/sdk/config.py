@@ -58,6 +58,14 @@ class EngineConfig:
     data_root: str = "/var/lib/lunar-sandbox"
     fail_fast: bool = False
     thresholds: ThresholdConfig | None = None
+    sandbox_backend: str = "auto"
+    """Sandbox backend: "native" (Linux kernel), "docker", or "auto".
+
+    "auto" tries native first, falls back to Docker if kernel features
+    are unavailable (e.g. on macOS).
+    """
+    docker_image: str = "python:3.12-slim"
+    """Docker image to use when sandbox_backend is "docker" or "auto"."""
 
     def effective_workers(self) -> int:
         """Return the effective worker count, auto-detecting if zero."""

@@ -346,14 +346,29 @@ class SandboxPool:
 
         Returns:
             Dict with running state, metrics snapshot, known fingerprints,
-            and per-fingerprint targets.
+            per-fingerprint targets, and per-fingerprint idle/active counts.
         """
         async with self._lock:
+            # Build per-fingerprint breakdown
+            fp_breakdown: dict[str, dict[str, int]] = {}
+            for fp in self._known_fingerprints:
+                idle = len(self._idle_pools.get(fp, {}))
+                active = sum(
+                    1 for e in self._active.values()
+                    if e.fingerprint == fp
+                )
+                fp_breakdown[fp] = {
+                    "idle_count": idle,
+                    "active_count": active,
+                    "total_count": idle + active,
+                }
+
             return {
                 "running": self._running,
                 "metrics": self._metrics.snapshot(),
                 "fingerprints": sorted(self._known_fingerprints),
                 "targets": dict(self._targets),
+                "fingerprint_breakdown": fp_breakdown,
             }
 
     @property

@@ -127,8 +127,8 @@ export default function SandboxDetail() {
   if (fetchError) {
     return (
       <div className="max-w-3xl mx-auto p-8">
-        <p className="text-red-400 text-sm">Error loading sandbox: {fetchError}</p>
-        <Link to="/" className="mt-4 inline-flex items-center gap-1 text-sm text-neutral-400 hover:text-neutral-200">
+        <p className="text-destructive text-sm">Error loading sandbox: {fetchError}</p>
+        <Link to="/" className="mt-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="size-4" />
           Back to Home
         </Link>
@@ -139,8 +139,8 @@ export default function SandboxDetail() {
   if (!sandbox) {
     return (
       <div className="max-w-3xl mx-auto p-8">
-        <p className="text-neutral-400 text-sm">Sandbox not found.</p>
-        <Link to="/" className="mt-4 inline-flex items-center gap-1 text-sm text-neutral-400 hover:text-neutral-200">
+        <p className="text-muted-foreground text-sm">Sandbox not found.</p>
+        <Link to="/" className="mt-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="size-4" />
           Back to Home
         </Link>
@@ -157,15 +157,15 @@ export default function SandboxDetail() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-2xl font-semibold tracking-tight">
             Sandbox{' '}
-            <span className="font-mono text-lg text-neutral-300">{sandboxId}</span>
+            <span className="font-mono text-lg text-muted-foreground">{sandboxId}</span>
           </h1>
           <StatusBadge status={sandbox.state} type="sandbox" />
         </div>
         <Link
           to="/"
-          className="inline-flex items-center gap-1 text-sm text-neutral-400 hover:text-neutral-200"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="size-4" />
           Home
@@ -173,43 +173,43 @@ export default function SandboxDetail() {
       </div>
 
       {/* Detail card */}
-      <Card>
+      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
         <CardHeader>
-          <CardTitle>Details</CardTitle>
+          <CardTitle className="text-base font-medium">Details</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
             <div>
-              <dt className="text-neutral-400 mb-1">Sandbox ID</dt>
+              <dt className="text-muted-foreground mb-1">Sandbox ID</dt>
               <dd className="font-mono text-xs break-all">{sandbox.sandbox_id}</dd>
             </div>
             <div>
-              <dt className="text-neutral-400 mb-1">Fingerprint</dt>
+              <dt className="text-muted-foreground mb-1">Fingerprint</dt>
               <dd className="font-mono text-xs truncate" title={sandbox.fingerprint}>
                 {sandbox.fingerprint || '--'}
               </dd>
             </div>
             <div>
-              <dt className="text-neutral-400 mb-1">State</dt>
+              <dt className="text-muted-foreground mb-1">State</dt>
               <dd>
                 <StatusBadge status={sandbox.state} type="sandbox" />
               </dd>
             </div>
             <div>
-              <dt className="text-neutral-400 mb-1">Started At</dt>
+              <dt className="text-muted-foreground mb-1">Started At</dt>
               <dd>{startedAtFormatted}</dd>
             </div>
             <div>
-              <dt className="text-neutral-400 mb-1">CPU %</dt>
-              <dd>
+              <dt className="text-muted-foreground mb-1">CPU %</dt>
+              <dd className="tabular-nums">
                 {sandbox.cpu_percent != null
                   ? `${sandbox.cpu_percent.toFixed(1)}%`
                   : '--'}
               </dd>
             </div>
             <div>
-              <dt className="text-neutral-400 mb-1">Memory MB</dt>
-              <dd>
+              <dt className="text-muted-foreground mb-1">Memory MB</dt>
+              <dd className="tabular-nums">
                 {sandbox.memory_mb != null
                   ? `${sandbox.memory_mb.toFixed(0)} MB`
                   : '--'}
@@ -242,7 +242,7 @@ export default function SandboxDetail() {
       </div>
 
       {stopError && (
-        <p className="text-sm text-red-400">{stopError}</p>
+        <p className="text-sm text-destructive">{stopError}</p>
       )}
     </div>
   )
@@ -251,19 +251,19 @@ export default function SandboxDetail() {
   const terminalPanel = terminalMountedRef.current ? (
     <div className={terminalOpen ? 'flex flex-col h-full' : 'hidden'}>
       {/* Drawer header bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-t border-zinc-800 bg-zinc-900 shrink-0">
-        <div className="flex items-center gap-2 text-xs text-zinc-400 font-mono">
+      <div className="flex items-center justify-between px-4 py-2 border-t border-border/50 bg-muted/50 shrink-0">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
           <TerminalIcon className="size-3.5" />
           <span>Terminal — {sandboxId}</span>
         </div>
         <Button
           variant="ghost"
           size="sm"
-          className="h-6 w-6 p-0 text-zinc-500 hover:text-zinc-200"
+          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
           onClick={handleToggleTerminal}
           aria-label="Close terminal"
         >
-          ×
+          x
         </Button>
       </div>
       {/* xterm.js terminal */}

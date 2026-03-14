@@ -86,21 +86,21 @@ function TaskGroup({ taskName, items, onEpisodeClick }: TaskGroupProps) {
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="w-full">
-        <div className="flex items-center gap-2 rounded px-3 py-2 hover:bg-zinc-800/50 cursor-pointer text-left">
+        <div className="flex items-center gap-2 rounded-md px-3 py-2 hover:bg-accent/50 cursor-pointer text-left transition-colors">
           <ChevronRight
             className={cn(
-              'size-4 text-zinc-500 transition-transform shrink-0',
+              'size-4 text-muted-foreground transition-transform shrink-0',
               open && 'rotate-90',
             )}
           />
-          <span className="font-mono text-sm text-zinc-200 flex-1 truncate">{taskName}</span>
+          <span className="font-mono text-sm flex-1 truncate">{taskName}</span>
           {/* Mini progress bar */}
           <div className="w-24 shrink-0">
-            <div className="flex h-2 overflow-hidden rounded-full bg-zinc-800">
+            <div className="flex h-1.5 overflow-hidden rounded-full bg-muted">
               {total > 0 && (
                 <>
                   <div
-                    className="bg-green-500"
+                    className="bg-emerald-500"
                     style={{ width: `${(passed / total) * 100}%` }}
                   />
                   <div
@@ -108,7 +108,7 @@ function TaskGroup({ taskName, items, onEpisodeClick }: TaskGroupProps) {
                     style={{ width: `${(failed / total) * 100}%` }}
                   />
                   <div
-                    className="bg-orange-500"
+                    className="bg-amber-500"
                     style={{ width: `${(errors / total) * 100}%` }}
                   />
                 </>
@@ -116,11 +116,11 @@ function TaskGroup({ taskName, items, onEpisodeClick }: TaskGroupProps) {
             </div>
           </div>
           {/* Pass/fail counts */}
-          <div className="flex items-center gap-2 shrink-0 text-xs font-mono text-zinc-400">
-            {passed > 0 && <span className="text-green-400">{passed}P</span>}
+          <div className="flex items-center gap-2 shrink-0 text-xs font-mono text-muted-foreground tabular-nums">
+            {passed > 0 && <span className="text-emerald-400">{passed}P</span>}
             {failed > 0 && <span className="text-red-400">{failed}F</span>}
-            {errors > 0 && <span className="text-orange-400">{errors}E</span>}
-            <span className="text-zinc-500">{total} ep</span>
+            {errors > 0 && <span className="text-amber-400">{errors}E</span>}
+            <span className="text-muted-foreground/60">{total} ep</span>
           </div>
         </div>
       </CollapsibleTrigger>
@@ -131,16 +131,16 @@ function TaskGroup({ taskName, items, onEpisodeClick }: TaskGroupProps) {
             <div
               key={episode.episode_id}
               onClick={() => onEpisodeClick(episode.episode_id)}
-              className="flex items-center gap-3 rounded px-3 py-1.5 cursor-pointer hover:bg-zinc-800/50"
+              className="flex items-center gap-3 rounded-md px-3 py-1.5 cursor-pointer hover:bg-accent/50 transition-colors"
             >
               <StatusBadge status={episode.outcome} type="outcome" />
-              <span className="text-xs font-mono text-zinc-400 w-16 shrink-0">
+              <span className="text-xs font-mono text-muted-foreground w-16 shrink-0 tabular-nums">
                 {formatDuration(episode.wall_clock_ms)}
               </span>
-              <span className="text-xs font-mono text-zinc-500 w-16 shrink-0">
+              <span className="text-xs font-mono text-muted-foreground/60 w-16 shrink-0 tabular-nums">
                 {formatCost(episode.estimated_cost)}
               </span>
-              <span className="text-xs font-mono text-zinc-500 truncate">
+              <span className="text-xs font-mono text-muted-foreground/60 truncate">
                 {episode.episode_id.slice(0, 16)}...
               </span>
             </div>

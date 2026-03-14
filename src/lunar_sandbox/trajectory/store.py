@@ -66,6 +66,18 @@ CREATE TABLE IF NOT EXISTS steps (
 );
 """
 
+_CREATE_TASKS = """\
+CREATE TABLE IF NOT EXISTS tasks (
+    name         TEXT PRIMARY KEY,
+    runtime      TEXT NOT NULL DEFAULT 'python3.12',
+    timeout      INTEGER NOT NULL DEFAULT 1800,
+    max_steps    INTEGER NOT NULL DEFAULT 200,
+    instructions TEXT NOT NULL DEFAULT '',
+    test_command TEXT NOT NULL DEFAULT '',
+    created_at   REAL NOT NULL
+);
+"""
+
 _INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_episodes_task ON episodes(task_name);",
     "CREATE INDEX IF NOT EXISTS idx_episodes_score ON episodes(score);",
@@ -148,8 +160,61 @@ class TrajectoryStore:
         assert self._conn is not None  # noqa: S101
         self._conn.execute(_CREATE_EPISODES)
         self._conn.execute(_CREATE_STEPS)
+        self._conn.execute(_CREATE_TASKS)
         for idx_sql in _INDEXES:
             self._conn.execute(idx_sql)
+
+    # -- task registration ---------------------------------------------------
+
+    def register_task(self, task: dict[str, Any]) -> None:
+        """Register a task definition (upsert by name).
+
+        Args:
+            task: Dict with at least ``name``. Optional keys:
+                ``runtime``, ``timeout``, ``max_steps``,
+                ``instructions``, ``test_command``.
+        """
+        assert self._conn is not None  # noqa: S101
+        import time as _time
+
+        self._conn.execute(
+            """INSERT OR REPLACE INTO tasks
+               (name, runtime, timeout, max_steps, instructions, test_command, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                task["name"],
+                task.get("runtime", "python3.12"),
+                task.get("timeout", 1800),
+                task.get("max_steps", 200),
+                task.get("instructions", ""),
+                task.get("test_command", ""),
+                _time.time(),
+            ),
+        )
+        logger.info("task_registered", task_name=task["name"])
+
+    def list_tasks(self) -> list[dict[str, Any]]:
+        """List all registered tasks ordered by name.
+
+        Returns:
+            List of task dicts.
+        """
+        assert self._conn is not None  # noqa: S101
+        rows = self._conn.execute(
+            "SELECT name, runtime, timeout, max_steps, instructions, test_command "
+            "FROM tasks ORDER BY name"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def delete_task(self, name: str) -> bool:
+        """Delete a registered task by name.
+
+        Returns:
+            True if the task existed and was deleted.
+        """
+        assert self._conn is not None  # noqa: S101
+        cursor = self._conn.execute("DELETE FROM tasks WHERE name = ?", (name,))
+        return cursor.rowcount > 0
 
     # -- ingestion -----------------------------------------------------------
 

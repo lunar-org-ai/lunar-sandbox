@@ -118,6 +118,30 @@ export async function fetchTasks(params?: {
   return res.json()
 }
 
+export async function createTask(task: {
+  name: string
+  runtime?: string
+  timeout?: number
+  max_steps?: number
+  instructions?: string
+  test_command?: string
+}): Promise<TaskSummary> {
+  const res = await fetch('/api/tasks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(task),
+  })
+  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  return res.json()
+}
+
+export async function deleteTask(taskName: string): Promise<void> {
+  const res = await fetch(`/api/tasks/${encodeURIComponent(taskName)}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) throw new Error(`API error: ${res.status}`)
+}
+
 export async function fetchTelemetryRuns(params?: {
   offset?: number
   limit?: number

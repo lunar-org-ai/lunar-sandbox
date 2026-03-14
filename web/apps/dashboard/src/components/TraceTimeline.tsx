@@ -20,6 +20,8 @@ export interface TraceTimelineProps {
   totalSpans: number
   onSpanSelect?: (span: TraceSpan | null) => void
   selectedSpanId?: string | null
+  /** Episode is still running (not yet complete) */
+  isRunning?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -41,6 +43,7 @@ export function TraceTimeline({
   totalSpans,
   onSpanSelect,
   selectedSpanId,
+  isRunning = false,
 }: TraceTimelineProps) {
   // --- Legend filter state ---
   const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set())
@@ -212,9 +215,19 @@ export function TraceTimeline({
   if (spans.length === 0) {
     return (
       <div className="flex h-full flex-col">
-        <StatusBar isLive={isLive} totalSpans={totalSpans} />
-        <div className="flex flex-1 items-center justify-center text-sm text-zinc-500">
-          No trace events
+        <StatusBar isLive={isLive || isRunning} totalSpans={totalSpans} />
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-zinc-500">
+          {isLive || isRunning ? (
+            <>
+              <span className="relative flex size-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                <span className="relative inline-flex size-4 rounded-full bg-blue-500" />
+              </span>
+              <span>Waiting for trace events…</span>
+            </>
+          ) : (
+            <span>No trace events</span>
+          )}
         </div>
       </div>
     )
@@ -223,7 +236,7 @@ export function TraceTimeline({
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
       {/* 1. Status bar */}
-      <StatusBar isLive={isLive} totalSpans={totalSpans} />
+      <StatusBar isLive={isLive || isRunning} totalSpans={totalSpans} />
 
       {/* 2. Legend bar */}
       <div className="flex flex-wrap gap-1.5 border-b border-zinc-800 px-3 py-2">

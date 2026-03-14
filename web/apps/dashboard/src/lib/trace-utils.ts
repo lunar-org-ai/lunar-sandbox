@@ -32,6 +32,9 @@ export const ACTION_TYPES = [
   'search_code',
   'run_tests',
   'get_logs',
+  'llm_call',
+  'upload',
+  'download',
 ] as const
 
 export type ActionType = (typeof ACTION_TYPES)[number]
@@ -82,6 +85,21 @@ export const ACTION_COLORS: Record<string, ActionColor> = {
     bg: 'bg-slate-500',
     text: 'text-slate-100',
     border: 'border-slate-500',
+  },
+  llm_call: {
+    bg: 'bg-purple-500',
+    text: 'text-purple-100',
+    border: 'border-purple-500',
+  },
+  upload: {
+    bg: 'bg-teal-500',
+    text: 'text-teal-100',
+    border: 'border-teal-500',
+  },
+  download: {
+    bg: 'bg-rose-500',
+    text: 'text-rose-100',
+    border: 'border-rose-500',
   },
   unknown: {
     bg: 'bg-zinc-500',

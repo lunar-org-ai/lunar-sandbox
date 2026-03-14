@@ -24,14 +24,11 @@ interface StatTileProps {
 
 function StatTile({ label, value }: StatTileProps) {
   return (
-    <div className="rounded bg-zinc-800 px-3 py-2">
-      <div className="text-[10px] uppercase tracking-wide text-zinc-500">
+    <div className="rounded-lg border border-border/50 bg-card/50 px-3 py-2">
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
         {label}
       </div>
-      <div
-        className="text-sm font-mono text-zinc-200"
-        style={{ fontVariantNumeric: "tabular-nums" }}
-      >
+      <div className="text-sm font-mono tabular-nums">
         {value}
       </div>
     </div>

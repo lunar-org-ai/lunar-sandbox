@@ -26,6 +26,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { StatusBadge } from '@/components/StatusBadge'
 import { fetchEpisodes, fetchBatches, type EpisodeSummary, type BatchSummary } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -59,15 +60,15 @@ function buildColumns(navigate: ReturnType<typeof useNavigate>): ColumnDef<Episo
         <Button
           variant="ghost"
           size="sm"
-          className="-ml-3 h-8 font-medium"
+          className="-ml-3 h-8 font-medium text-muted-foreground/70"
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         >
           Task
-          <ArrowUpDown className="ml-1 size-3 opacity-60" />
+          <ArrowUpDown className="ml-1 size-3 opacity-40" />
         </Button>
       ),
       cell: ({ row }) => (
-        <span className="text-sm font-mono">{row.getValue('task_name')}</span>
+        <span className="text-sm font-mono text-foreground">{row.getValue('task_name')}</span>
       ),
     },
     {
@@ -83,17 +84,17 @@ function buildColumns(navigate: ReturnType<typeof useNavigate>): ColumnDef<Episo
         <Button
           variant="ghost"
           size="sm"
-          className="-ml-3 h-8 font-medium"
+          className="-ml-3 h-8 font-medium text-muted-foreground/70"
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         >
           Score
-          <ArrowUpDown className="ml-1 size-3 opacity-60" />
+          <ArrowUpDown className="ml-1 size-3 opacity-40" />
         </Button>
       ),
       cell: ({ row }) => {
         const score: number | null = row.getValue('score')
         return (
-          <span className="text-right block">
+          <span className="text-right block tabular-nums">
             {score != null ? score.toFixed(2) : '--'}
           </span>
         )
@@ -105,15 +106,15 @@ function buildColumns(navigate: ReturnType<typeof useNavigate>): ColumnDef<Episo
         <Button
           variant="ghost"
           size="sm"
-          className="-ml-3 h-8 font-medium"
+          className="-ml-3 h-8 font-medium text-muted-foreground/70"
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         >
           Duration
-          <ArrowUpDown className="ml-1 size-3 opacity-60" />
+          <ArrowUpDown className="ml-1 size-3 opacity-40" />
         </Button>
       ),
       cell: ({ row }) => (
-        <span className="text-right block">{formatDuration(row.getValue('duration_ms'))}</span>
+        <span className="text-right block tabular-nums text-muted-foreground">{formatDuration(row.getValue('duration_ms'))}</span>
       ),
     },
     {
@@ -122,15 +123,15 @@ function buildColumns(navigate: ReturnType<typeof useNavigate>): ColumnDef<Episo
         <Button
           variant="ghost"
           size="sm"
-          className="-ml-3 h-8 font-medium"
+          className="-ml-3 h-8 font-medium text-muted-foreground/70"
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         >
           Cost
-          <ArrowUpDown className="ml-1 size-3 opacity-60" />
+          <ArrowUpDown className="ml-1 size-3 opacity-40" />
         </Button>
       ),
       cell: ({ row }) => (
-        <span className="text-right block">{formatCost(row.getValue('cost_usd'))}</span>
+        <span className="text-right block tabular-nums text-muted-foreground">{formatCost(row.getValue('cost_usd'))}</span>
       ),
     },
     {
@@ -139,18 +140,18 @@ function buildColumns(navigate: ReturnType<typeof useNavigate>): ColumnDef<Episo
         <Button
           variant="ghost"
           size="sm"
-          className="-ml-3 h-8 font-medium"
+          className="-ml-3 h-8 font-medium text-muted-foreground/70"
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         >
           Date
-          <ArrowUpDown className="ml-1 size-3 opacity-60" />
+          <ArrowUpDown className="ml-1 size-3 opacity-40" />
         </Button>
       ),
       cell: ({ row }) => {
         const ts: number = row.getValue('started_at')
-        if (!ts) return <span className="text-right block text-neutral-400">--</span>
+        if (!ts) return <span className="text-right block text-muted-foreground">--</span>
         return (
-          <span className="text-right block text-neutral-400 text-xs">
+          <span className="text-right block text-muted-foreground text-xs">
             {formatDistanceToNow(new Date(ts * 1000), { addSuffix: true })}
           </span>
         )
@@ -193,13 +194,13 @@ function BatchesTab() {
   }
 
   if (batchError) {
-    return <p className="text-sm text-red-400 mt-4">Error: {batchError}</p>
+    return <p className="text-sm text-destructive mt-4">Error: {batchError}</p>
   }
 
   if (batches.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center mt-4">
-        <p className="text-neutral-400 text-sm">No batches found.</p>
+        <p className="text-muted-foreground text-sm">No batches found.</p>
       </div>
     )
   }
@@ -215,31 +216,31 @@ function BatchesTab() {
           <div
             key={batch.batch_id}
             onClick={() => navigate(`/batches/${batch.batch_id}`)}
-            className="flex items-center gap-4 rounded-lg border border-zinc-800 bg-zinc-900/30 px-4 py-3 cursor-pointer hover:bg-zinc-800/50 transition-colors"
+            className="flex items-center gap-4 rounded-lg border border-border/50 bg-card/50 px-4 py-3 cursor-pointer hover:bg-accent/50 transition-colors"
           >
             {/* Batch ID */}
-            <span className="font-mono text-sm text-zinc-200 w-40 truncate shrink-0">
+            <span className="font-mono text-sm text-foreground w-40 truncate shrink-0">
               {batch.batch_id.slice(0, 20)}
             </span>
 
             {/* Benchmark name */}
-            <span className="font-mono text-xs text-zinc-500 flex-1 truncate">
+            <span className="font-mono text-xs text-muted-foreground flex-1 truncate">
               {batch.benchmark_name || '--'}
             </span>
 
             {/* Progress */}
-            <span className="text-xs text-zinc-400 shrink-0">
+            <span className="text-xs text-muted-foreground shrink-0">
               {completed}/{batch.total_tasks} complete
             </span>
 
             {/* Pass rate */}
-            <span className="text-xs font-mono text-green-400 w-16 text-right shrink-0">
+            <span className="text-xs font-mono text-emerald-400 w-16 text-right shrink-0">
               {passRatePct !== '--' ? `${passRatePct}%` : '--'}
             </span>
 
             {/* Started at */}
             {batch.started_at > 0 && (
-              <span className="text-xs text-zinc-500 shrink-0">
+              <span className="text-xs text-muted-foreground shrink-0">
                 {formatDistanceToNow(new Date(batch.started_at * 1000), { addSuffix: true })}
               </span>
             )}
@@ -352,11 +353,11 @@ export default function Runs() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-6 space-y-6 max-w-6xl mx-auto">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Run History</h1>
-        <p className="text-sm text-neutral-400 mt-1">Browse and filter past evaluation runs.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Run History</h1>
+        <p className="text-sm text-muted-foreground mt-1">Browse and filter past evaluation runs.</p>
       </div>
 
       {/* Episodes / Batches tabs */}
@@ -378,15 +379,12 @@ export default function Runs() {
                   variant="outline"
                   size="sm"
                   onClick={() => toggleOutcome(outcome)}
-                  className={
-                    outcomeFilters.has(outcome)
-                      ? outcome === 'pass'
-                        ? 'bg-green-500/10 text-green-400 border-green-500/40'
-                        : outcome === 'fail'
-                        ? 'bg-red-500/10 text-red-400 border-red-500/40'
-                        : 'bg-orange-500/10 text-orange-400 border-orange-500/40'
-                      : ''
-                  }
+                  className={cn(
+                    'h-7 text-xs border-border/50',
+                    outcomeFilters.has(outcome) && outcome === 'pass' && 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+                    outcomeFilters.has(outcome) && outcome === 'fail' && 'bg-red-500/10 text-red-400 border-red-500/30',
+                    outcomeFilters.has(outcome) && outcome === 'error' && 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+                  )}
                 >
                   {outcome}
                 </Button>
@@ -398,7 +396,7 @@ export default function Runs() {
                 placeholder="Filter by task..."
                 value={taskSearch}
                 onChange={(e) => setTaskSearch(e.target.value)}
-                className="h-8 w-48 text-sm"
+                className="h-7 w-48 text-sm"
               />
 
               {/* Date range */}
@@ -406,14 +404,14 @@ export default function Runs() {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="h-8 w-36 text-sm"
+                className="h-7 w-36 text-sm"
                 title="From date"
               />
               <Input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="h-8 w-36 text-sm"
+                className="h-7 w-36 text-sm"
                 title="To date"
               />
 
@@ -426,7 +424,7 @@ export default function Runs() {
                 step="0.1"
                 min="0"
                 max="1"
-                className="h-8 w-28 text-sm"
+                className="h-7 w-28 text-sm"
               />
 
               {/* Clear filters */}
@@ -434,7 +432,7 @@ export default function Runs() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 text-neutral-400 hover:text-neutral-200"
+                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
                   onClick={() => {
                     setOutcomeFilters(new Set())
                     setTaskSearch('')
@@ -450,7 +448,7 @@ export default function Runs() {
 
             {/* Error */}
             {fetchError && (
-              <p className="text-sm text-red-400">Error: {fetchError}</p>
+              <p className="text-sm text-destructive">Error: {fetchError}</p>
             )}
 
             {/* Table */}
@@ -462,52 +460,54 @@ export default function Runs() {
               </div>
             ) : episodes.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <p className="text-neutral-400 text-sm">No runs found. Adjust filters or launch a new experiment.</p>
+                <p className="text-muted-foreground text-sm">No runs found. Adjust filters or launch a new experiment.</p>
                 <Link
                   to="/launcher"
-                  className="mt-3 text-sm text-blue-400 hover:text-blue-300 underline underline-offset-4"
+                  className="mt-3 text-sm text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors"
                 >
                   Go to Launcher
                 </Link>
               </div>
             ) : (
               <>
-                <Table>
-                  <TableHeader>
-                    {table.getHeaderGroups().map((headerGroup) => (
-                      <TableRow key={headerGroup.id} className="border-neutral-800 hover:bg-transparent">
-                        {headerGroup.headers.map((header) => (
-                          <TableHead key={header.id} className="text-neutral-400">
-                            {header.isPlaceholder
-                              ? null
-                              : flexRender(header.column.columnDef.header, header.getContext())}
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableHeader>
-                  <TableBody>
-                    {table.getRowModel().rows.map((row) => {
-                      const episode = row.original
-                      return (
-                        <TableRow
-                          key={row.id}
-                          onClick={() => navigate(`/runs/${episode.episode_id}`)}
-                          className="cursor-pointer hover:bg-neutral-800/50 border-neutral-800"
-                        >
-                          {row.getVisibleCells().map((cell) => (
-                            <TableCell key={cell.id}>
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </TableCell>
+                <div className="rounded-lg border border-border/50 overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      {table.getHeaderGroups().map((headerGroup) => (
+                        <TableRow key={headerGroup.id} className="border-border/50 hover:bg-transparent">
+                          {headerGroup.headers.map((header) => (
+                            <TableHead key={header.id} className="text-muted-foreground/70">
+                              {header.isPlaceholder
+                                ? null
+                                : flexRender(header.column.columnDef.header, header.getContext())}
+                            </TableHead>
                           ))}
                         </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
+                      ))}
+                    </TableHeader>
+                    <TableBody>
+                      {table.getRowModel().rows.map((row) => {
+                        const episode = row.original
+                        return (
+                          <TableRow
+                            key={row.id}
+                            onClick={() => navigate(`/runs/${episode.episode_id}`)}
+                            className="cursor-pointer hover:bg-accent/50 border-border/50 transition-colors"
+                          >
+                            {row.getVisibleCells().map((cell) => (
+                              <TableCell key={cell.id}>
+                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
 
                 {/* Pagination */}
-                <div className="flex items-center justify-between text-sm text-neutral-400 pt-2">
+                <div className="flex items-center justify-between text-sm text-muted-foreground pt-2">
                   <span>
                     Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}
                   </span>
@@ -515,6 +515,7 @@ export default function Runs() {
                     <Button
                       variant="outline"
                       size="sm"
+                      className="h-7"
                       disabled={offset === 0}
                       onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
                     >
@@ -523,6 +524,7 @@ export default function Runs() {
                     <Button
                       variant="outline"
                       size="sm"
+                      className="h-7"
                       disabled={offset + PAGE_SIZE >= total}
                       onClick={() => setOffset(offset + PAGE_SIZE)}
                     >

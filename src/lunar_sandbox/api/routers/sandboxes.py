@@ -324,35 +324,33 @@ async def pool_health(
         logger.warning("pool_health_failed", error=str(exc))
         return PoolHealthDetail(running=False, total_sandboxes=0)
 
-    # Group sandboxes by fingerprint
-    fp_map: dict[str, FingerprintHealth] = {}
-    for sandbox in status.get("sandboxes", []):
-        fp = sandbox.get("fingerprint", "unknown")
-        state = sandbox.get("state", "")
-        if fp not in fp_map:
-            fp_map[fp] = FingerprintHealth(fingerprint=fp)
-        entry = fp_map[fp]
-        entry.total_count += 1
-        if state in ("pooled", "Idle"):
-            entry.idle_count += 1
-        elif state == "Running":
-            entry.active_count += 1
+    metrics = status.get("metrics", {})
+    fp_breakdown = status.get("fingerprint_breakdown", {})
 
-    # Pull eviction and cache metrics from engine metrics if available
-    metrics: dict = {}
-    try:
-        metrics = await engine.metrics() if hasattr(engine, "metrics") else {}
-    except Exception:
-        pass
+    # Build per-fingerprint health from breakdown + per-fp metrics
+    fps_list: list[FingerprintHealth] = []
+    for fp, counts in fp_breakdown.items():
+        fp_hits = metrics.get("hits_by_fingerprint", {}).get(fp, 0)
+        fp_misses = metrics.get("misses_by_fingerprint", {}).get(fp, 0)
+        fp_total = fp_hits + fp_misses
+        hit_rate = round(fp_hits / fp_total, 3) if fp_total > 0 else None
 
-    fps_list = list(fp_map.values())
-    total_evictions = int(metrics.get("total_evictions", 0))
-    overall_hit_rate = metrics.get("cache_hit_rate")
-    metrics_running = status.get("running", False)
+        fps_list.append(FingerprintHealth(
+            fingerprint=fp,
+            idle_count=counts.get("idle_count", 0),
+            active_count=counts.get("active_count", 0),
+            total_count=counts.get("total_count", 0),
+            eviction_count=0,
+            cache_hit_rate=hit_rate,
+        ))
+
     total = sum(f.total_count for f in fps_list)
+    total_evictions = int(metrics.get("total_evictions", 0))
+    overall_hit_rate = round(metrics.get("hit_rate", 0.0), 3) if metrics.get("hit_rate") else None
+    is_running = status.get("running", False)
 
     return PoolHealthDetail(
-        running=metrics_running,
+        running=is_running,
         total_sandboxes=total,
         fingerprints=fps_list,
         overall_cache_hit_rate=overall_hit_rate,

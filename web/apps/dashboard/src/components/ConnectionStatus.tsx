@@ -34,11 +34,11 @@ function useToasts() {
 
 const toastStyles: Record<Toast['variant'], string> = {
   success:
-    'bg-green-900/90 text-green-100 border border-green-700',
+    'bg-emerald-950/90 text-emerald-200 border border-emerald-800/50 backdrop-blur-sm',
   warning:
-    'bg-yellow-900/90 text-yellow-100 border border-yellow-700',
+    'bg-amber-950/90 text-amber-200 border border-amber-800/50 backdrop-blur-sm',
   error:
-    'bg-red-900/90 text-red-100 border border-red-700',
+    'bg-red-950/90 text-red-200 border border-red-800/50 backdrop-blur-sm',
 }
 
 function ToastContainer({ toasts }: { toasts: Toast[] }) {
@@ -49,7 +49,7 @@ function ToastContainer({ toasts }: { toasts: Toast[] }) {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`px-4 py-2 rounded-lg text-sm shadow-lg ${toastStyles[t.variant]}`}
+          className={`px-4 py-2.5 rounded-lg text-sm shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200 ${toastStyles[t.variant]}`}
         >
           {t.message}
         </div>
@@ -67,17 +67,17 @@ const stateConfig: Record<
   { dot: string; label: string; tooltip: string }
 > = {
   connected: {
-    dot: 'bg-green-500',
+    dot: 'bg-emerald-500',
     label: 'Live',
     tooltip: 'Connected',
   },
   connecting: {
-    dot: 'bg-yellow-500',
+    dot: 'bg-amber-500 animate-pulse',
     label: 'Connecting...',
     tooltip: 'Connecting...',
   },
   reconnecting: {
-    dot: 'bg-yellow-500',
+    dot: 'bg-amber-500 animate-pulse',
     label: 'Reconnecting...',
     tooltip: 'Reconnecting...',
   },
@@ -132,14 +132,14 @@ export function ConnectionStatus() {
   return (
     <>
       {/* Status dot + label */}
-      <div className="flex items-center gap-1.5" title={tooltip}>
-        <span className={`${dot} rounded-full w-2 h-2`} />
-        <span className="text-xs text-zinc-400">{label}</span>
+      <div className="flex items-center gap-2 rounded-full border border-border/50 px-2.5 py-1" title={tooltip}>
+        <span className={`${dot} rounded-full size-1.5`} />
+        <span className="text-xs text-muted-foreground">{label}</span>
       </div>
 
       {/* Warning banner */}
       {showBanner && (
-        <div className="fixed top-12 left-0 right-0 z-40 bg-amber-600 text-neutral-950 text-sm text-center py-1.5 px-4 font-medium">
+        <div className="fixed top-12 left-0 right-0 z-40 bg-amber-500/90 text-black text-sm text-center py-1.5 px-4 font-medium backdrop-blur-sm">
           Real-time updates paused &mdash; reconnecting...
         </div>
       )}

@@ -36,25 +36,25 @@ interface FormatPickerProps {
 function FormatPicker({ value, onChange }: FormatPickerProps) {
   return (
     <div className="flex items-center gap-4">
-      <label className="flex items-center gap-1.5 cursor-pointer text-sm text-zinc-300">
+      <label className="flex items-center gap-1.5 cursor-pointer text-sm text-foreground">
         <input
           type="radio"
           name="format"
           value="json"
           checked={value === 'json'}
           onChange={() => onChange('json')}
-          className="accent-zinc-400"
+          className="accent-foreground"
         />
         JSON
       </label>
-      <label className="flex items-center gap-1.5 cursor-pointer text-sm text-zinc-300">
+      <label className="flex items-center gap-1.5 cursor-pointer text-sm text-foreground">
         <input
           type="radio"
           name="format"
           value="csv"
           checked={value === 'csv'}
           onChange={() => onChange('csv')}
-          className="accent-zinc-400"
+          className="accent-foreground"
         />
         CSV
       </label>
@@ -106,44 +106,41 @@ function EpisodesExportCard() {
   }
 
   return (
-    <Card>
+    <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
       <CardHeader>
-        <CardTitle className="text-base">Episodes</CardTitle>
+        <CardTitle className="text-base font-medium">Episodes</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="text-xs text-zinc-400 uppercase tracking-wide">Date from</label>
+            <label className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">Date from</label>
             <Input
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="bg-zinc-900 border-zinc-700 text-zinc-200"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs text-zinc-400 uppercase tracking-wide">Date to</label>
+            <label className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">Date to</label>
             <Input
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="bg-zinc-900 border-zinc-700 text-zinc-200"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs text-zinc-400 uppercase tracking-wide">Task name</label>
+            <label className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">Task name</label>
             <Input
               type="text"
               placeholder="Filter by task name"
               value={taskName}
               onChange={(e) => setTaskName(e.target.value)}
-              className="bg-zinc-900 border-zinc-700 text-zinc-200 placeholder:text-zinc-500"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs text-zinc-400 uppercase tracking-wide">Outcome</label>
+            <label className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">Outcome</label>
             <Select value={outcome} onValueChange={setOutcome}>
-              <SelectTrigger className="bg-zinc-900 border-zinc-700 text-zinc-200">
+              <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -163,7 +160,7 @@ function EpisodesExportCard() {
           </Button>
         </div>
 
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </CardContent>
     </Card>
   )
@@ -199,9 +196,9 @@ function BatchesExportCard() {
   }
 
   return (
-    <Card>
+    <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
       <CardHeader>
-        <CardTitle className="text-base">Batches</CardTitle>
+        <CardTitle className="text-base font-medium">Batches</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
@@ -210,7 +207,7 @@ function BatchesExportCard() {
             {loading ? 'Exporting...' : 'Export All Batches'}
           </Button>
         </div>
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </CardContent>
     </Card>
   )
@@ -246,9 +243,9 @@ function TelemetryExportCard() {
   }
 
   return (
-    <Card>
+    <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
       <CardHeader>
-        <CardTitle className="text-base">Telemetry</CardTitle>
+        <CardTitle className="text-base font-medium">Telemetry</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
@@ -257,7 +254,7 @@ function TelemetryExportCard() {
             {loading ? 'Exporting...' : 'Export Telemetry'}
           </Button>
         </div>
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </CardContent>
     </Card>
   )
@@ -271,8 +268,8 @@ export default function Export() {
   return (
     <div className="max-w-3xl mx-auto p-8 space-y-8">
       <div>
-        <h1 className="text-xl font-semibold text-zinc-100">Export Data</h1>
-        <p className="text-sm text-zinc-400 mt-1">
+        <h1 className="text-2xl font-semibold tracking-tight">Export Data</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Download runs, batches, and telemetry data as JSON or CSV.
         </p>
       </div>

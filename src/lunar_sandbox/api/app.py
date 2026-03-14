@@ -56,10 +56,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     global _engine, _engine_started
 
+    import os
+
     # Lazy import to avoid triggering Linux-only code at module load
     from lunar_sandbox.sdk import EngineConfig, LunarEngine
 
-    engine = LunarEngine(EngineConfig())
+    sandbox_backend = os.environ.get("LUNAR_SANDBOX_BACKEND", "auto")
+    docker_image = os.environ.get("LUNAR_DOCKER_IMAGE", "python:3.12-slim")
+
+    engine = LunarEngine(EngineConfig(
+        sandbox_backend=sandbox_backend,
+        docker_image=docker_image,
+    ))
     try:
         await engine.start()
         _engine_started = True

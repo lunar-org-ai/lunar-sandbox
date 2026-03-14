@@ -21,12 +21,12 @@ interface KeyboardShortcutsOverlayProps {
 function ShortcutRow({ keys, description }: ShortcutRowProps) {
   return (
     <div className="flex items-center justify-between gap-4 py-1.5">
-      <span className="text-sm text-zinc-300">{description}</span>
+      <span className="text-sm text-foreground/80">{description}</span>
       <div className="flex items-center gap-1 shrink-0">
         {keys.map((key, i) => (
           <kbd
             key={i}
-            className="inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-mono font-semibold text-zinc-300 bg-zinc-800 border border-zinc-700 rounded min-w-[24px]"
+            className="inline-flex items-center justify-center px-1.5 py-0.5 text-[11px] font-mono font-medium text-foreground/70 bg-muted border border-border rounded min-w-[24px]"
           >
             {key}
           </kbd>
@@ -42,7 +42,7 @@ function ShortcutRow({ keys, description }: ShortcutRowProps) {
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold pt-4 pb-1 first:pt-0">
+    <h3 className="text-[11px] uppercase tracking-widest text-muted-foreground font-medium pt-4 pb-1 first:pt-0">
       {children}
     </h3>
   )
@@ -55,14 +55,14 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 export function KeyboardShortcutsOverlay({ open, onOpenChange }: KeyboardShortcutsOverlayProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md bg-zinc-900 border-zinc-800 text-zinc-100">
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-base font-semibold text-zinc-100">
+          <DialogTitle className="text-base font-medium">
             Keyboard Shortcuts
           </DialogTitle>
         </DialogHeader>
 
-        <div className="mt-2 divide-y divide-zinc-800">
+        <div className="mt-2 divide-y divide-border/50">
           {/* Global shortcuts */}
           <div className="pb-3">
             <SectionHeading>Global</SectionHeading>
