@@ -29,6 +29,10 @@ class ActionType(str, Enum):
     Core actions (execute_command, read_file, write_file, submit) are
     the fundamental primitives. The remaining actions are convenience
     wrappers built on top.
+
+    CUA actions (screenshot through cursor_position) match the
+    ``computer_20251124`` tool primitive names from Anthropic's API
+    exactly, so action values can be passed directly without translation.
     """
 
     EXECUTE_COMMAND = "execute_command"
@@ -39,6 +43,19 @@ class ActionType(str, Enum):
     SEARCH_CODE = "search_code"
     RUN_TESTS = "run_tests"
     GET_LOGS = "get_logs"
+
+    # CUA actions -- names match Anthropic computer_20251124 primitives exactly
+    SCREENSHOT = "screenshot"
+    MOUSE_MOVE = "mouse_move"
+    LEFT_CLICK = "left_click"
+    RIGHT_CLICK = "right_click"
+    DOUBLE_CLICK = "double_click"
+    MIDDLE_CLICK = "middle_click"
+    LEFT_CLICK_DRAG = "left_click_drag"
+    TYPE = "type"
+    KEY = "key"
+    SCROLL = "scroll"
+    CURSOR_POSITION = "cursor_position"
 
 
 class ActionStatus(str, Enum):
@@ -154,4 +171,16 @@ ACTION_TIMEOUTS: dict[ActionType, float] = {
     ActionType.SEARCH_CODE: 60.0,
     ActionType.RUN_TESTS: 300.0,
     ActionType.GET_LOGS: 10.0,
+    # CUA action timeouts
+    ActionType.SCREENSHOT: 10.0,       # maim is fast
+    ActionType.MOUSE_MOVE: 5.0,
+    ActionType.LEFT_CLICK: 5.0,
+    ActionType.RIGHT_CLICK: 5.0,
+    ActionType.DOUBLE_CLICK: 5.0,
+    ActionType.MIDDLE_CLICK: 5.0,
+    ActionType.LEFT_CLICK_DRAG: 10.0,  # drag involves multiple xdotool steps
+    ActionType.TYPE: 30.0,             # long text with --delay can take time
+    ActionType.KEY: 5.0,
+    ActionType.SCROLL: 5.0,
+    ActionType.CURSOR_POSITION: 5.0,
 }
