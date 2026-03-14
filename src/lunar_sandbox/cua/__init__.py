@@ -1,6 +1,7 @@
 """CUA (Computer-Using Agent) task definitions, observation models, and episode runner."""
 
 from lunar_sandbox.cua.observation import CUAObservation
+from lunar_sandbox.cua.retention import RetentionPolicy, cleanup_episodes
 from lunar_sandbox.cua.task import (
     CUATask,
     ManualReward,
@@ -16,4 +17,6 @@ __all__ = [
     "ManualReward",
     "RewardVariant",
     "CUAObservation",
+    "RetentionPolicy",
+    "cleanup_episodes",
 ]
