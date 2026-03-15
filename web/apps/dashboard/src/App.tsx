@@ -16,6 +16,7 @@ import BatchDetail from '@/routes/BatchDetail'
 import EpisodeReplay from '@/routes/EpisodeReplay'
 import Export from '@/routes/Export'
 import PoolHealth from '@/routes/PoolHealth'
+import CUALiveView from '@/routes/CUALiveView'
 
 // ---------------------------------------------------------------------------
 // AppShell — needs to be inside BrowserRouter so CommandPalette can useNavigate
@@ -86,6 +87,7 @@ function AppShell() {
             <Route path="/replay/:id" element={<EpisodeReplay />} />
             <Route path="/export" element={<Export />} />
             <Route path="/pool" element={<PoolHealth />} />
+            <Route path="/cua/live/:id" element={<CUALiveView />} />
           </Routes>
         </main>
       </div>

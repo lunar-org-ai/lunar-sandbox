@@ -179,3 +179,95 @@ export async function fetchPoolHealth(): Promise<PoolHealthDetail> {
   if (!res.ok) throw new Error(`API error: ${res.status}`)
   return res.json()
 }
+
+// ---------------------------------------------------------------------------
+// CUA Episodes
+// ---------------------------------------------------------------------------
+
+export interface CUALaunchParams {
+  instruction: string
+  reward_type?: string
+  start_url?: string
+  resolution?: string
+  max_steps?: number
+  time_limit?: number
+  script_content?: string
+  reference_image_url?: string
+  screenshot_threshold?: number
+}
+
+export interface CUALaunchResponse {
+  episode_id: string
+  vnc_url: string
+}
+
+export interface CUAEpisodeInfo {
+  episode_id: string
+  task_name: string
+  outcome: string
+  score: number | null
+  review_notes: string | null
+  step_count: number
+  duration_ms: number
+  started_at: number
+  ended_at: number | null
+  episode_type: string
+}
+
+export interface CUAScoreResponse {
+  episode_id: string
+  score: number
+  next_episode_id: string | null
+}
+
+export async function launchCUAEpisode(params: CUALaunchParams): Promise<CUALaunchResponse> {
+  const res = await fetch('/api/cua/episodes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  })
+  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  return res.json()
+}
+
+export async function fetchCUAEpisodes(params?: {
+  offset?: number
+  limit?: number
+}): Promise<PaginatedEpisodes> {
+  const searchParams = new URLSearchParams()
+  if (params?.offset !== undefined) searchParams.set('offset', String(params.offset))
+  if (params?.limit !== undefined) searchParams.set('limit', String(params.limit))
+  const query = searchParams.toString()
+  const res = await fetch(`/api/cua/episodes${query ? `?${query}` : ''}`)
+  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  return res.json()
+}
+
+export async function fetchCUAEpisodeDetail(episodeId: string): Promise<CUAEpisodeInfo> {
+  const res = await fetch(`/api/cua/episodes/${encodeURIComponent(episodeId)}`)
+  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  return res.json()
+}
+
+export async function scoreCUAEpisode(
+  episodeId: string,
+  score: number,
+  notes?: string,
+): Promise<CUAScoreResponse> {
+  const res = await fetch(`/api/cua/episodes/${encodeURIComponent(episodeId)}/score`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ score, notes }),
+  })
+  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  return res.json()
+}
+
+export function cuaScreenshotUrl(episodeId: string, filename: string): string {
+  return `/api/cua/episodes/${encodeURIComponent(episodeId)}/screenshots/${encodeURIComponent(filename)}`
+}
+
+export function cuaVncWebSocketUrl(episodeId: string): string {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${window.location.host}/api/cua/vnc/${encodeURIComponent(episodeId)}`
+}
