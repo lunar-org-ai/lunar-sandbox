@@ -164,6 +164,7 @@ class TrajectoryStore:
         for idx_sql in _INDEXES:
             self._conn.execute(idx_sql)
         self._migrate_add_episode_type()
+        self._migrate_add_review_notes()
 
     def _migrate_add_episode_type(self) -> None:
         """Add episode_type column to episodes table if it doesn't exist.
@@ -184,6 +185,20 @@ class TrajectoryStore:
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_episodes_type ON episodes(episode_type);"
         )
+
+    def _migrate_add_review_notes(self) -> None:
+        """Add review_notes column to episodes table if it doesn't exist.
+
+        Follows the same pattern as _migrate_add_episode_type(): checks via
+        PRAGMA table_info and issues ALTER TABLE only when the column is absent.
+        """
+        assert self._conn is not None  # noqa: S101
+        columns = {
+            row[1] for row in self._conn.execute("PRAGMA table_info(episodes)").fetchall()
+        }
+        if "review_notes" not in columns:
+            self._conn.execute("ALTER TABLE episodes ADD COLUMN review_notes TEXT")
+            logger.info("migration_review_notes_added")
 
     # -- task registration ---------------------------------------------------
 
@@ -545,6 +560,70 @@ class TrajectoryStore:
         else:
             row = self._conn.execute("SELECT COUNT(*) FROM episodes").fetchone()
         return row[0]
+
+    # -- CUA review ----------------------------------------------------------
+
+    def update_episode_score(
+        self,
+        episode_id: str,
+        score: float,
+        review_notes: str | None = None,
+    ) -> bool:
+        """Update the score (and optionally review_notes) for a CUA episode.
+
+        Args:
+            episode_id: The episode to update.
+            score: Reward score to persist.
+            review_notes: Optional human review notes.
+
+        Returns:
+            True if the episode was found and updated, False otherwise.
+        """
+        assert self._conn is not None  # noqa: S101
+        with self._conn:
+            cursor = self._conn.execute(
+                "UPDATE episodes SET score = ?, review_notes = ? WHERE episode_id = ?",
+                (score, review_notes, episode_id),
+            )
+        updated = cursor.rowcount > 0
+        if updated:
+            logger.info(
+                "episode_score_updated",
+                episode_id=episode_id,
+                score=score,
+            )
+        return updated
+
+    def query_next_unreviewed(
+        self,
+        current_episode_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Return the oldest unreviewed CUA episode, excluding the current one.
+
+        An episode is considered unreviewed when it has ``episode_type='cua'``,
+        ``score IS NULL``, and ``is_complete=1``.
+
+        Args:
+            current_episode_id: If provided, this episode is excluded from results
+                so the caller can move to a different episode.
+
+        Returns:
+            Episode dict for the next pending review, or None if the queue is empty.
+        """
+        assert self._conn is not None  # noqa: S101
+        clauses = [
+            "episode_type = 'cua'",
+            "score IS NULL",
+            "is_complete = 1",
+        ]
+        params: list[Any] = []
+        if current_episode_id is not None:
+            clauses.append("episode_id != ?")
+            params.append(current_episode_id)
+        where = " AND ".join(clauses)
+        sql = f"SELECT * FROM episodes WHERE {where} ORDER BY started_at ASC LIMIT 1"
+        row = self._conn.execute(sql, params).fetchone()
+        return self._row_to_dict(row) if row is not None else None
 
     # -- export --------------------------------------------------------------
 

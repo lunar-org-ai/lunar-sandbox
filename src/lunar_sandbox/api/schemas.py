@@ -16,6 +16,11 @@ from lunar_sandbox.api.pagination import PaginatedResponse
 __all__ = [
     "BatchDetail",
     "BatchSummary",
+    "CUAEpisodeInfo",
+    "CUALaunchRequest",
+    "CUALaunchResponse",
+    "CUAScoreRequest",
+    "CUAScoreResponse",
     "EpisodeDetail",
     "EpisodeSummary",
     "FingerprintHealth",
@@ -272,4 +277,62 @@ class WsEnvelope(BaseModel):
     """Unix timestamp (seconds since epoch)."""
 
     payload: dict[str, Any]
-    """Event data — reuses existing schema shapes."""
+    """Event data -- reuses existing schema shapes."""
+
+
+# ---------------------------------------------------------------------------
+# CUA
+# ---------------------------------------------------------------------------
+
+
+class CUALaunchRequest(BaseModel):
+    """Request body for launching a CUA episode."""
+
+    instruction: str
+    reward_type: str = "manual"  # "manual", "script", "screenshot_match"
+    start_url: str | None = None
+    resolution: str = "1280x800"
+    max_steps: int = 100
+    time_limit: float = 300.0
+    # Script reward fields
+    script_content: str | None = None
+    # Screenshot match fields
+    reference_image_url: str | None = None
+    screenshot_threshold: float = 0.95
+
+
+class CUALaunchResponse(BaseModel):
+    """Response after CUA episode launch."""
+
+    episode_id: str
+    vnc_url: str  # WebSocket URL for live VNC
+
+
+class CUAScoreRequest(BaseModel):
+    """Request body for scoring a CUA episode."""
+
+    score: float
+    notes: str | None = None
+
+
+class CUAScoreResponse(BaseModel):
+    """Response after scoring."""
+
+    episode_id: str
+    score: float
+    next_episode_id: str | None = None  # next unreviewed episode
+
+
+class CUAEpisodeInfo(BaseModel):
+    """CUA episode with review info."""
+
+    episode_id: str
+    task_name: str
+    outcome: str
+    score: float | None = None
+    review_notes: str | None = None
+    step_count: int = 0
+    duration_ms: float = 0.0
+    started_at: float = 0.0
+    ended_at: float | None = None
+    episode_type: str = "cua"
