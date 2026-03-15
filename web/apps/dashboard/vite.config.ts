@@ -13,6 +13,10 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
+      '/novnc': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
     },
   },
   resolve: {
