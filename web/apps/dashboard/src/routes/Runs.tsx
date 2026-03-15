@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { StatusBadge } from '@/components/StatusBadge'
 import { fetchEpisodes, fetchBatches, type EpisodeSummary, type BatchSummary } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import CUALauncher from '@/routes/CUALauncher'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -360,11 +361,12 @@ export default function Runs() {
         <p className="text-sm text-muted-foreground mt-1">Browse and filter past evaluation runs.</p>
       </div>
 
-      {/* Episodes / Batches tabs */}
+      {/* Episodes / Batches / New CUA Episode tabs */}
       <Tabs defaultValue="episodes">
         <TabsList>
           <TabsTrigger value="episodes">Episodes</TabsTrigger>
           <TabsTrigger value="batches">Batches</TabsTrigger>
+          <TabsTrigger value="new-cua">New CUA Episode</TabsTrigger>
         </TabsList>
 
         {/* Episodes tab */}
@@ -540,6 +542,11 @@ export default function Runs() {
         {/* Batches tab */}
         <TabsContent value="batches">
           <BatchesTab />
+        </TabsContent>
+
+        {/* New CUA Episode tab */}
+        <TabsContent value="new-cua">
+          <CUALauncher />
         </TabsContent>
       </Tabs>
     </div>
