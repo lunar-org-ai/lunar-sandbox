@@ -61,13 +61,20 @@ class ScreenshotReward(BaseModel):
 
     Attributes:
         type: Discriminator literal, always ``"screenshot_match"``.
-        reference_image: Path or identifier of the reference image.
+        reference_image: Path to the reference image file. If relative,
+            resolved against the task definition directory.
         threshold: Minimum SSIM score to count as success (0.0 - 1.0).
+        crop_region: Optional bounding box (x, y, width, height) for
+            region-of-interest comparison. If None, the full image is compared.
+        step_index: Which episode screenshot to compare against the reference.
+            -1 (default) means the last screenshot. 0 means the first, etc.
     """
 
     type: Literal["screenshot_match"] = "screenshot_match"
     reference_image: str
     threshold: float = 0.95
+    crop_region: tuple[int, int, int, int] | None = None
+    step_index: int = -1
 
 
 class ManualReward(BaseModel):
