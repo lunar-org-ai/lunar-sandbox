@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 __all__ = [
     "get_engine",
     "get_telemetry_store",
+    "get_trajectory_dir",
     "get_trajectory_store",
 ]
 
@@ -46,6 +47,23 @@ def get_trajectory_store() -> TrajectoryStore:
     if store is None:
         raise HTTPException(status_code=503, detail="Trajectory store not available")
     return store
+
+
+def get_trajectory_dir() -> Path:
+    """Return the trajectory directory path from the engine config.
+
+    Raises:
+        HTTPException: 503 if the engine or config is not available.
+    """
+    from pathlib import Path
+
+    engine = get_engine()
+    if not hasattr(engine, "_config") or engine._config is None:
+        raise HTTPException(status_code=503, detail="Engine config not available")
+    td = getattr(engine._config, "trajectory_dir", None)
+    if td is None:
+        raise HTTPException(status_code=503, detail="Trajectory directory not configured")
+    return Path(td)
 
 
 def get_telemetry_store() -> TelemetryStore:
