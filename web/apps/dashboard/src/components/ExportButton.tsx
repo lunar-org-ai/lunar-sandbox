@@ -1,12 +1,12 @@
-import { useState } from 'react'
-import { Download } from 'lucide-react'
+import { Download, FileJson, FileSpreadsheet } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { downloadCsv, downloadJson } from '@/lib/export-utils'
 
 // ---------------------------------------------------------------------------
@@ -29,24 +29,20 @@ export function ExportButton({
   csvRows,
   disabled = false,
 }: ExportButtonProps) {
-  const [open, setOpen] = useState(false)
-
   function handleJson() {
     downloadJson(data, filename)
-    setOpen(false)
   }
 
   function handleCsv() {
     if (!csvRows) return
     downloadCsv(csvRows, filename)
-    setOpen(false)
   }
 
   const hasCsvRows = csvRows !== undefined && csvRows.length > 0
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
           size="sm"
@@ -56,30 +52,17 @@ export function ExportButton({
           <Download className="size-3.5" />
           Export
         </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-44 p-1" align="end">
-        <div className="flex flex-col">
-          <button
-            type="button"
-            onClick={handleJson}
-            className="w-full rounded-md px-3 py-2 text-sm text-left hover:bg-accent transition-colors"
-          >
-            Export as JSON
-          </button>
-          <button
-            type="button"
-            onClick={handleCsv}
-            disabled={!hasCsvRows}
-            className={`w-full rounded-md px-3 py-2 text-sm text-left transition-colors ${
-              hasCsvRows
-                ? 'hover:bg-accent'
-                : 'text-muted-foreground cursor-not-allowed'
-            }`}
-          >
-            Export as CSV
-          </button>
-        </div>
-      </PopoverContent>
-    </Popover>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={handleJson}>
+          <FileJson className="size-4" />
+          Export as JSON
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleCsv} disabled={!hasCsvRows}>
+          <FileSpreadsheet className="size-4" />
+          Export as CSV
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

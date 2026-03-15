@@ -143,7 +143,7 @@ class CUAEpisodeRunner:
         self._episode_id = episode_id or f"cua-ep-{uuid4().hex[:8]}"
         self._trajectory_dir = trajectory_dir
         self._handler = CUAActionHandler(sandbox, sandbox._cua_config)
-        self._agent_is_async = asyncio.iscoroutinefunction(agent)
+        self._agent_is_async = asyncio.iscoroutinefunction(agent) or asyncio.iscoroutinefunction(getattr(agent, '__call__', None))
         self._log = log.bind(episode_id=self._episode_id)
 
     # ------------------------------------------------------------------
@@ -224,6 +224,7 @@ class CUAEpisodeRunner:
                 # c. Build observation
                 observation = CUAObservation(
                     screenshot_path=screenshot_rel_path,
+                    screenshot_b64=b64_screenshot,
                     screen_size=(w, h),
                     cursor_position=cursor_pos,
                     timestamp=time.time(),
@@ -398,7 +399,7 @@ class CUAEpisodeRunner:
             state=StepState(),  # CUA steps don't track cwd/open_files
             action=action_name,
             action_params=action_params,
-            observation=observation.model_dump(),
+            observation=observation.model_dump(exclude={"screenshot_b64"}),
             duration_ms=duration_ms,
             source="cua",
             sandbox_id=self._sandbox._config.sandbox_id,

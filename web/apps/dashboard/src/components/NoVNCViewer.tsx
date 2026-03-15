@@ -51,7 +51,10 @@ export function NoVNCViewer({
       // Dynamically import RFB from the locally-served static bundle.
       // @vite-ignore prevents Vite from trying to analyse/bundle this import.
       if (!rfbClassRef.current) {
-        const mod = await import(/* @vite-ignore */ '/novnc/core/rfb.js')
+        // Use a variable so Vite's static import analysis skips this entirely.
+        // The file is served by FastAPI at runtime, not bundled by Vite.
+        const rfbUrl = '/novnc/core/rfb.js'
+        const mod = await import(/* @vite-ignore */ rfbUrl)
         rfbClassRef.current = mod.default
       }
 

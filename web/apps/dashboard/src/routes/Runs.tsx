@@ -10,8 +10,9 @@ import {
   type SortingState,
 } from '@tanstack/react-table'
 import { formatDistanceToNow } from 'date-fns'
-import { ArrowUpDown } from 'lucide-react'
+import { AlertCircle, ArrowUpDown } from 'lucide-react'
 
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -195,7 +196,12 @@ function BatchesTab() {
   }
 
   if (batchError) {
-    return <p className="text-sm text-destructive mt-4">Error: {batchError}</p>
+    return (
+      <Alert variant="destructive" className="mt-4">
+        <AlertCircle className="size-4" />
+        <AlertDescription>{batchError}</AlertDescription>
+      </Alert>
+    )
   }
 
   if (batches.length === 0) {
@@ -450,7 +456,10 @@ export default function Runs() {
 
             {/* Error */}
             {fetchError && (
-              <p className="text-sm text-destructive">Error: {fetchError}</p>
+              <Alert variant="destructive">
+                <AlertCircle className="size-4" />
+                <AlertDescription>{fetchError}</AlertDescription>
+              </Alert>
             )}
 
             {/* Table */}

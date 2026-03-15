@@ -23,6 +23,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     lxterminal \
     mousepad \
     pcmanfm \
+    # Taskbar panel (Windows-like bottom bar)
+    tint2 \
+    # Background setting utility
+    x11-xserver-utils \
     # D-Bus (required by some GTK apps in containers)
     dbus-x11 \
     # Fonts

@@ -1,9 +1,14 @@
-.PHONY: setup dev codegen lint test clean
+.PHONY: setup dev codegen lint test clean docker-cua
 
 # One-command setup for fresh clones
 setup:
 	uv sync
 	cd web && pnpm install
+	$(MAKE) docker-cua
+
+# Build the CUA Docker image
+docker-cua:
+	docker build -t lunar-cua:latest src/lunar_sandbox/docker/cua/
 
 # Start both FastAPI + Vite dev servers
 dev:

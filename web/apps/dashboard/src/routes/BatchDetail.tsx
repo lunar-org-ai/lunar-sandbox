@@ -1,5 +1,15 @@
 import { useNavigate, useParams, Link } from 'react-router'
+import { AlertCircle } from 'lucide-react'
 
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { BatchProgressBar } from '@/components/BatchProgressBar'
@@ -44,8 +54,24 @@ export default function BatchDetail() {
 
   if (error && !batch) {
     return (
-      <div className="p-6 max-w-6xl mx-auto">
-        <p className="text-sm text-destructive">Error: {error}</p>
+      <div className="p-6 max-w-6xl mx-auto space-y-4">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/runs">Batches</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Error</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+        <Alert variant="destructive">
+          <AlertCircle className="size-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       </div>
     )
   }
@@ -112,13 +138,19 @@ export default function BatchDetail() {
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       {/* Breadcrumb + export */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <nav className="text-sm text-muted-foreground">
-          <Link to="/runs" className="hover:text-foreground transition-colors">
-            Batches
-          </Link>
-          <span className="mx-1.5 text-border">/</span>
-          <span className="text-foreground font-mono">{batch.batch_id}</span>
-        </nav>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/runs">Batches</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage className="font-mono">{batch.batch_id}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
         <ExportButton
           data={batch}
           filename={`batch-${id ?? batch.batch_id}`}

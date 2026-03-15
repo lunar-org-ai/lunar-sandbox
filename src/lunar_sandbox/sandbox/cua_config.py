@@ -58,6 +58,10 @@ class CUASandboxConfig(DockerSandboxConfig):
     vnc_port: int = 5900
     novnc_port: int = 6080
 
+    # Host port published for VNC proxy access (mapped to vnc_port).
+    # 0 means no port is published.
+    host_vnc_port: int = 0
+
     # Action timing and screenshot quality
     action_delay_ms: int = 50
     screenshot_quality: int = 7

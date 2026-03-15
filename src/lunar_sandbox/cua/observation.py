@@ -42,6 +42,7 @@ class CUAObservation(BaseModel):
     """
 
     screenshot_path: str = ""
+    screenshot_b64: str = ""
     screen_size: tuple[int, int] = (1280, 800)
     cursor_position: tuple[int, int] | None = None
     action_result: dict[str, Any] | None = None

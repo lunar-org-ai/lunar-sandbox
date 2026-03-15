@@ -25,7 +25,11 @@ interface CUAFilmstripProps {
  */
 function extractScreenshotPath(span: TraceSpan): string | null {
   const path = span.observation['screenshot_path']
-  if (typeof path === 'string' && path.length > 0) return path
+  if (typeof path === 'string' && path.length > 0) {
+    // Extract just the filename (path is relative like "screenshots/step_000.jpg")
+    const parts = path.split('/')
+    return parts[parts.length - 1]
+  }
   return null
 }
 

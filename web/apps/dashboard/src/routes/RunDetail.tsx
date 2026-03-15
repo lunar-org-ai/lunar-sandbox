@@ -1,10 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { format } from 'date-fns'
-import { ArrowLeft, GitBranch, LayoutGrid, List, RotateCcw } from 'lucide-react'
+import { AlertCircle, GitBranch, LayoutGrid, List, RotateCcw } from 'lucide-react'
 import type { PanelImperativeHandle } from 'react-resizable-panels'
 import { useHotkeys } from 'react-hotkeys-hook'
 
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb'
 import {
   Card,
   CardContent,
@@ -18,6 +27,12 @@ import {
 } from '@/components/ui/resizable'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { ExportButton } from '@/components/ExportButton'
 import { StatusBadge } from '@/components/StatusBadge'
 import { TraceDetailPanel } from '@/components/TraceDetailPanel'
@@ -169,14 +184,23 @@ export default function RunDetail() {
   if (fetchError) {
     return (
       <div className="max-w-6xl mx-auto p-8 space-y-4">
-        <Link
-          to="/runs"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="size-4" />
-          Runs
-        </Link>
-        <p className="text-destructive text-sm">{fetchError}</p>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/runs">Runs</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Error</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+        <Alert variant="destructive">
+          <AlertCircle className="size-4" />
+          <AlertDescription>{fetchError}</AlertDescription>
+        </Alert>
       </div>
     )
   }
@@ -263,18 +287,20 @@ function RunDetailContent({
 
   return (
     <div className="max-w-6xl mx-auto p-8 space-y-6">
-      {/* Breadcrumb / back navigation */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Link
-          to="/runs"
-          className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="size-4" />
-          Runs
-        </Link>
-        <span className="text-border">/</span>
-        <span className="font-mono text-foreground/80 text-xs truncate max-w-xs">{episodeId}</span>
-      </div>
+      {/* Breadcrumb */}
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link to="/runs">Runs</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage className="font-mono text-xs truncate max-w-xs">{episodeId}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
 
       {/* Outcome Summary Card */}
       <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
@@ -344,44 +370,38 @@ function RunDetailContent({
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium text-muted-foreground">{cardTitle}</CardTitle>
             {/* View mode toggle */}
-            <div className="flex gap-0.5 bg-muted rounded-md p-0.5">
-              <button
-                type="button"
-                title="Timeline (1)"
-                onClick={() => setViewModeAndParam('timeline')}
-                className={`px-2 py-1 rounded-sm text-xs transition-colors ${
-                  viewMode === 'timeline'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <List className="size-3.5" />
-              </button>
-              <button
-                type="button"
-                title="Graph (2)"
-                onClick={() => setViewModeAndParam('graph')}
-                className={`px-2 py-1 rounded-sm text-xs transition-colors ${
-                  viewMode === 'graph'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <GitBranch className="size-3.5" />
-              </button>
-              <button
-                type="button"
-                title="Split view (3)"
-                onClick={() => setViewModeAndParam('split')}
-                className={`px-2 py-1 rounded-sm text-xs transition-colors ${
-                  viewMode === 'split'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <LayoutGrid className="size-3.5" />
-              </button>
-            </div>
+            <ToggleGroup
+              type="single"
+              value={viewMode}
+              onValueChange={(v) => { if (v) setViewModeAndParam(v as ViewMode) }}
+              size="sm"
+              variant="outline"
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <ToggleGroupItem value="timeline" className="px-2 py-1">
+                    <List className="size-3.5" />
+                  </ToggleGroupItem>
+                </TooltipTrigger>
+                <TooltipContent>Timeline (1)</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <ToggleGroupItem value="graph" className="px-2 py-1">
+                    <GitBranch className="size-3.5" />
+                  </ToggleGroupItem>
+                </TooltipTrigger>
+                <TooltipContent>Graph (2)</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <ToggleGroupItem value="split" className="px-2 py-1">
+                    <LayoutGrid className="size-3.5" />
+                  </ToggleGroupItem>
+                </TooltipTrigger>
+                <TooltipContent>Split view (3)</TooltipContent>
+              </Tooltip>
+            </ToggleGroup>
           </div>
         </CardHeader>
         <div

@@ -1,9 +1,10 @@
-import { Activity, Download, Home, List, Play } from 'lucide-react'
+import { Activity, Command, Download, Home, List, Play } from 'lucide-react'
 import { Link, useLocation } from 'react-router'
 
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
@@ -12,6 +13,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar'
+import { Separator } from '@/components/ui/separator'
 
 const navItems = [
   { title: 'Home', url: '/', icon: Home },
@@ -58,6 +60,24 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
+
+      <SidebarFooter>
+        <Separator className="mb-2" />
+        <div className="px-2 pb-2 space-y-1 group-data-[collapsible=icon]:hidden">
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground/50">
+            <kbd className="inline-flex items-center gap-0.5 rounded border border-border/50 bg-muted px-1 py-0.5 font-mono text-[10px]">
+              <Command className="size-2.5" />K
+            </kbd>
+            <span>Search</span>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground/50">
+            <kbd className="inline-flex items-center rounded border border-border/50 bg-muted px-1 py-0.5 font-mono text-[10px]">
+              ?
+            </kbd>
+            <span>Shortcuts</span>
+          </div>
+        </div>
+      </SidebarFooter>
 
       <SidebarRail />
     </Sidebar>

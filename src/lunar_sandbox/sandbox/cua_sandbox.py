@@ -153,9 +153,14 @@ class CUASandbox(DockerSandbox):
         for key, val in self._config.extra_env.items():
             cmd.extend(["-e", f"{key}={val}"])
 
-        # Port exposure: noVNC port for VNC debugging access from the host.
-        novnc_port = self._cua_config.novnc_port
-        cmd.extend(["-p", f"{novnc_port}:{novnc_port}"])
+        # Port exposure: publish websockify port for direct noVNC access.
+        # noVNC (browser) connects directly to websockify (WebSocket),
+        # which bridges to x11vnc (TCP) inside the container.
+        if self._cua_config.host_vnc_port:
+            cmd.extend([
+                "-p",
+                f"{self._cua_config.host_vnc_port}:{self._cua_config.novnc_port}",
+            ])
 
         # Image only -- no trailing command; the ENTRYPOINT handles desktop startup.
         cmd.append(self._config.image)
@@ -216,7 +221,7 @@ class CUASandbox(DockerSandbox):
             container_id=self._container_id,
             image=self._config.image,
             resolution=self._cua_config.resolution,
-            novnc_port=novnc_port,
+            host_vnc_port=self._cua_config.host_vnc_port,
         )
 
     def execute(

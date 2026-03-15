@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { AlertCircle } from 'lucide-react'
 
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Card,
   CardContent,
@@ -8,6 +10,8 @@ import {
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   Select,
   SelectContent,
@@ -31,34 +35,26 @@ type ExportFormat = 'json' | 'csv'
 interface FormatPickerProps {
   value: ExportFormat
   onChange: (v: ExportFormat) => void
+  /** Unique prefix for radio IDs to avoid label conflicts across multiple pickers */
+  id: string
 }
 
-function FormatPicker({ value, onChange }: FormatPickerProps) {
+function FormatPicker({ value, onChange, id }: FormatPickerProps) {
   return (
-    <div className="flex items-center gap-4">
-      <label className="flex items-center gap-1.5 cursor-pointer text-sm text-foreground">
-        <input
-          type="radio"
-          name="format"
-          value="json"
-          checked={value === 'json'}
-          onChange={() => onChange('json')}
-          className="accent-foreground"
-        />
-        JSON
-      </label>
-      <label className="flex items-center gap-1.5 cursor-pointer text-sm text-foreground">
-        <input
-          type="radio"
-          name="format"
-          value="csv"
-          checked={value === 'csv'}
-          onChange={() => onChange('csv')}
-          className="accent-foreground"
-        />
-        CSV
-      </label>
-    </div>
+    <RadioGroup
+      value={value}
+      onValueChange={(v) => onChange(v as ExportFormat)}
+      className="flex items-center gap-4"
+    >
+      <div className="flex items-center gap-1.5">
+        <RadioGroupItem value="json" id={`${id}-json`} />
+        <Label htmlFor={`${id}-json`} className="cursor-pointer text-sm">JSON</Label>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <RadioGroupItem value="csv" id={`${id}-csv`} />
+        <Label htmlFor={`${id}-csv`} className="cursor-pointer text-sm">CSV</Label>
+      </div>
+    </RadioGroup>
   )
 }
 
@@ -154,13 +150,18 @@ function EpisodesExportCard() {
         </div>
 
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <FormatPicker value={format} onChange={setFormat} />
+          <FormatPicker value={format} onChange={setFormat} id="episodes" />
           <Button onClick={handleExport} disabled={loading} size="sm">
             {loading ? 'Exporting...' : 'Export Episodes'}
           </Button>
         </div>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="size-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
       </CardContent>
     </Card>
   )
@@ -202,12 +203,17 @@ function BatchesExportCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <FormatPicker value={format} onChange={setFormat} />
+          <FormatPicker value={format} onChange={setFormat} id="batches" />
           <Button onClick={handleExport} disabled={loading} size="sm">
             {loading ? 'Exporting...' : 'Export All Batches'}
           </Button>
         </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="size-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
       </CardContent>
     </Card>
   )
@@ -249,12 +255,17 @@ function TelemetryExportCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <FormatPicker value={format} onChange={setFormat} />
+          <FormatPicker value={format} onChange={setFormat} id="telemetry" />
           <Button onClick={handleExport} disabled={loading} size="sm">
             {loading ? 'Exporting...' : 'Export Telemetry'}
           </Button>
         </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="size-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
       </CardContent>
     </Card>
   )

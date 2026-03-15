@@ -187,6 +187,7 @@ export async function fetchPoolHealth(): Promise<PoolHealthDetail> {
 export interface CUALaunchParams {
   instruction: string
   reward_type?: string
+  agent_mode?: 'manual' | 'model'
   start_url?: string
   resolution?: string
   max_steps?: number
@@ -268,6 +269,11 @@ export function cuaScreenshotUrl(episodeId: string, filename: string): string {
 }
 
 export function cuaVncWebSocketUrl(episodeId: string): string {
+  // Connect directly to the FastAPI server (port 8000) for VNC WebSocket
+  // traffic. Vite's dev proxy doesn't reliably handle binary WebSocket
+  // subprotocols used by the RFB/VNC protocol.
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${protocol}//${window.location.host}/api/cua/vnc/${encodeURIComponent(episodeId)}`
+  const host = window.location.hostname
+  const apiPort = '8000'
+  return `${protocol}//${host}:${apiPort}/api/cua/vnc/${encodeURIComponent(episodeId)}`
 }

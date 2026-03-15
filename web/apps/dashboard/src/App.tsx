@@ -7,6 +7,8 @@ import { CommandPalette } from '@/components/CommandPalette'
 import { ConnectionStatus } from '@/components/ConnectionStatus'
 import { KeyboardShortcutsOverlay } from '@/components/KeyboardShortcutsOverlay'
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { Toaster } from '@/components/ui/sonner'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import Home from '@/routes/Home'
 import Launcher from '@/routes/Launcher'
 import Runs from '@/routes/Runs'
@@ -67,35 +69,38 @@ function AppShell() {
   )
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <div className="flex-1 flex flex-col min-h-screen">
-        <header className="sticky top-0 z-30 flex h-12 items-center gap-3 border-b border-border/50 bg-background/80 backdrop-blur-xl px-4">
-          <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
-          <div className="ml-auto">
-            <ConnectionStatus />
-          </div>
-        </header>
-        <main className="flex-1 bg-background text-foreground">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/launcher" element={<Launcher />} />
-            <Route path="/runs" element={<Runs />} />
-            <Route path="/runs/:id" element={<RunDetail />} />
-            <Route path="/sandboxes/:id" element={<SandboxDetail />} />
-            <Route path="/batches/:id" element={<BatchDetail />} />
-            <Route path="/replay/:id" element={<EpisodeReplay />} />
-            <Route path="/export" element={<Export />} />
-            <Route path="/pool" element={<PoolHealth />} />
-            <Route path="/cua/live/:id" element={<CUALiveView />} />
-          </Routes>
-        </main>
-      </div>
+    <TooltipProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        <div className="flex-1 flex flex-col min-h-screen">
+          <header className="sticky top-0 z-30 flex h-12 items-center gap-3 border-b border-border/50 bg-background/80 backdrop-blur-xl px-4">
+            <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+            <div className="ml-auto">
+              <ConnectionStatus />
+            </div>
+          </header>
+          <main className="flex-1 bg-background text-foreground">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/launcher" element={<Launcher />} />
+              <Route path="/runs" element={<Runs />} />
+              <Route path="/runs/:id" element={<RunDetail />} />
+              <Route path="/sandboxes/:id" element={<SandboxDetail />} />
+              <Route path="/batches/:id" element={<BatchDetail />} />
+              <Route path="/replay/:id" element={<EpisodeReplay />} />
+              <Route path="/export" element={<Export />} />
+              <Route path="/pool" element={<PoolHealth />} />
+              <Route path="/cua/live/:id" element={<CUALiveView />} />
+            </Routes>
+          </main>
+        </div>
 
-      {/* Global overlays */}
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
-      <KeyboardShortcutsOverlay open={helpOpen} onOpenChange={setHelpOpen} />
-    </SidebarProvider>
+        {/* Global overlays */}
+        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+        <KeyboardShortcutsOverlay open={helpOpen} onOpenChange={setHelpOpen} />
+        <Toaster />
+      </SidebarProvider>
+    </TooltipProvider>
   )
 }
 

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
+import { AlertCircle } from 'lucide-react'
 
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,6 +15,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { useSandboxUpdates } from '@/hooks/useSandboxUpdates'
 import {
   fetchEpisodes,
@@ -44,7 +51,10 @@ function EngineStatusCard() {
       </CardHeader>
       <CardContent>
         {error ? (
-          <p className="text-destructive text-sm">{error}</p>
+          <Alert variant="destructive" className="p-3">
+            <AlertCircle className="size-4" />
+            <AlertDescription className="text-xs">{error}</AlertDescription>
+          </Alert>
         ) : !data ? (
           <div className="space-y-2">
             <Skeleton className="h-5 w-24" />
@@ -204,19 +214,29 @@ function SandboxRow({ sandbox, onStop, stopping }: SandboxRowProps) {
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-            <Link to={`/sandboxes/${sandbox.sandbox_id}`}>View</Link>
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
+                <Link to={`/sandboxes/${sandbox.sandbox_id}`}>View</Link>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>View sandbox details</TooltipContent>
+          </Tooltip>
           {sandbox.state === 'Running' && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs text-destructive hover:text-destructive"
-              disabled={stopping}
-              onClick={() => onStop(sandbox.sandbox_id)}
-            >
-              Stop
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-destructive hover:text-destructive"
+                  disabled={stopping}
+                  onClick={() => onStop(sandbox.sandbox_id)}
+                >
+                  Stop
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Stop this sandbox</TooltipContent>
+            </Tooltip>
           )}
         </div>
       </TableCell>
@@ -243,7 +263,10 @@ function SandboxTable() {
 
   if (error) {
     return (
-      <p className="text-destructive text-sm p-4">{error}</p>
+      <Alert variant="destructive" className="m-4">
+        <AlertCircle className="size-4" />
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
     )
   }
 

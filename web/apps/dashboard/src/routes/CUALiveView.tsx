@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams, Link, useNavigate } from 'react-router'
+import { useParams, Link, useNavigate, useLocation } from 'react-router'
 import {
   Eye,
   MousePointer,
@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { NoVNCViewer } from '@/components/NoVNCViewer'
-import { fetchCUAEpisodeDetail, cuaVncWebSocketUrl, type CUAEpisodeInfo } from '@/lib/api'
+import { fetchCUAEpisodeDetail, type CUAEpisodeInfo } from '@/lib/api'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -32,7 +32,11 @@ function formatElapsed(seconds: number): string {
 export default function CUALiveView() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const episodeId = id ?? ''
+
+  // VNC URL passed from launcher via navigation state
+  const vncUrl = (location.state as { vncUrl?: string } | null)?.vncUrl ?? ''
 
   // Connection state
   const [connected, setConnected] = useState(false)
@@ -124,7 +128,7 @@ export default function CUALiveView() {
   // ---------------------------------------------------------------------------
   // Derived values
   // ---------------------------------------------------------------------------
-  const wsUrl = episodeId ? cuaVncWebSocketUrl(episodeId) : ''
+  const wsUrl = vncUrl
   const isRunning = !complete
   const statusLabel = complete ? 'Complete' : 'Running'
 

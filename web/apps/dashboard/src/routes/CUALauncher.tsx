@@ -25,6 +25,13 @@ import { launchCUAEpisode } from '@/lib/api'
 // Reward type options
 // ---------------------------------------------------------------------------
 
+const AGENT_MODES = [
+  { value: 'manual', label: 'Manual (view-only sandbox)' },
+  { value: 'model', label: 'AI Model (Claude computer-use)' },
+] as const
+
+type AgentMode = (typeof AGENT_MODES)[number]['value']
+
 const REWARD_TYPES = [
   { value: 'manual', label: 'Manual Review' },
   { value: 'script', label: 'Script Validation' },
@@ -42,6 +49,7 @@ export default function CUALauncher() {
 
   // Core fields
   const [instruction, setInstruction] = useState('')
+  const [agentMode, setAgentMode] = useState<AgentMode>('manual')
   const [rewardType, setRewardType] = useState<RewardType>('manual')
 
   // Script reward
@@ -84,6 +92,7 @@ export default function CUALauncher() {
     try {
       const response = await launchCUAEpisode({
         instruction: instruction.trim(),
+        agent_mode: agentMode,
         reward_type: rewardType,
         script_content: rewardType === 'script' ? scriptContent || undefined : undefined,
         reference_image_url: rewardType === 'screenshot_match' ? referenceImageUrl.trim() || undefined : undefined,
@@ -93,7 +102,9 @@ export default function CUALauncher() {
         max_steps: maxSteps ? parseInt(maxSteps, 10) : undefined,
         time_limit: timeLimit ? parseFloat(timeLimit) : undefined,
       })
-      navigate(`/cua/live/${response.episode_id}`)
+      navigate(`/cua/live/${response.episode_id}`, {
+        state: { vncUrl: response.vnc_url },
+      })
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Failed to launch CUA episode.')
       setLoading(false)
@@ -134,6 +145,28 @@ export default function CUALauncher() {
             {validationError && (
               <p className="text-xs text-destructive">{validationError}</p>
             )}
+          </div>
+
+          {/* Agent mode */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">Agent Mode</label>
+            <Select value={agentMode} onValueChange={(v) => setAgentMode(v as AgentMode)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {AGENT_MODES.map((am) => (
+                  <SelectItem key={am.value} value={am.value}>
+                    {am.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {agentMode === 'model'
+                ? 'Claude will see the screen and interact autonomously. Requires ANTHROPIC_API_KEY on the server.'
+                : 'Sandbox stays alive for you to observe or interact via the live view.'}
+            </p>
           </div>
 
           {/* Reward type */}

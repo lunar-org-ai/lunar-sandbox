@@ -74,15 +74,30 @@ def _parse_resolution(resolution: str) -> tuple[int, int]:
         return 1280, 800
 
 
-async def _placeholder_agent(obs: Any) -> dict[str, Any]:
-    """Minimal placeholder agent that stops immediately.
+class _ManualAgent:
+    """Agent that keeps the sandbox alive until explicitly stopped.
 
-    This is used for v3.0 episode launch where the real agent is user code
-    running externally.  The agent simply waits briefly and returns stop so
-    the runner's action loop terminates cleanly.
+    Used for dashboard-launched episodes where the user interacts via noVNC.
+    The agent idles each step (sleeping briefly) and returns a no-op action.
+    Call ``stop()`` to make the next agent call return ``{"action": "stop"}``.
     """
-    await asyncio.sleep(0.1)
-    return {"action": "stop"}
+
+    def __init__(self) -> None:
+        self._stop_event = asyncio.Event()
+
+    def stop(self) -> None:
+        self._stop_event.set()
+
+    async def __call__(self, obs: Any) -> dict[str, Any]:
+        # Wait up to 2s or until stopped — keeps the sandbox alive
+        # without busy-looping.
+        try:
+            await asyncio.wait_for(self._stop_event.wait(), timeout=2.0)
+        except asyncio.TimeoutError:
+            pass
+        if self._stop_event.is_set():
+            return {"action": "stop"}
+        return {"action": "screenshot"}
 
 
 # ---------------------------------------------------------------------------
@@ -140,8 +155,8 @@ async def launch_cua_episode(
     # -- Parse resolution ----------------------------------------------------
     width, height = _parse_resolution(req.resolution)
 
-    # -- Allocate a unique host port to avoid concurrent episode collisions --
-    novnc_port = _allocate_free_port()
+    # -- Allocate a unique host port for VNC proxy access --------------------
+    host_vnc_port = _allocate_free_port()
 
     # -- Build CUATask -------------------------------------------------------
     task = CUATask(
@@ -153,11 +168,16 @@ async def launch_cua_episode(
         resolution=req.resolution,
     )
 
+    # -- Generate episode_id early (needed by sandbox config) ----------------
+    import uuid
+    episode_id = f"cua-ep-{uuid.uuid4().hex[:8]}"
+
     # -- Create and start CUASandbox ----------------------------------------
     config = CUASandboxConfig(
+        sandbox_id=episode_id,
         width=width,
         height=height,
-        novnc_port=novnc_port,
+        host_vnc_port=host_vnc_port,
     )
     sandbox = CUASandbox(config)
 
@@ -178,14 +198,27 @@ async def launch_cua_episode(
         if td is not None:
             trajectory_dir = Path(td)
 
-    # Generate episode_id from the runner (we pre-generate to return it now)
-    import uuid
-    episode_id = f"cua-ep-{uuid.uuid4().hex[:8]}"
+    # -- Choose agent based on mode -------------------------------------------
+    agent: Any
+    if req.agent_mode == "model":
+        from lunar_sandbox.cua.model_agent import ModelAgent
+        try:
+            agent = ModelAgent(
+                instruction=req.instruction,
+                screen_size=(width, height),
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=str(exc),
+            ) from exc
+    else:
+        agent = _ManualAgent()
 
     runner = CUAEpisodeRunner(
         task=task,
         sandbox=sandbox,
-        agent=_placeholder_agent,
+        agent=agent,
         episode_id=episode_id,
         trajectory_dir=trajectory_dir,
     )
@@ -194,8 +227,9 @@ async def launch_cua_episode(
     _active_episodes[episode_id] = {
         "sandbox": sandbox,
         "task": task,
-        "novnc_port": novnc_port,
+        "host_vnc_port": host_vnc_port,
         "runner_task": None,
+        "agent": agent,
     }
 
     # -- Start episode runner as background task (do NOT await) -------------
@@ -227,12 +261,12 @@ async def launch_cua_episode(
     log.info(
         "cua_episode_launched",
         episode_id=episode_id,
-        novnc_port=novnc_port,
+        host_vnc_port=host_vnc_port,
     )
 
     return CUALaunchResponse(
         episode_id=episode_id,
-        vnc_url=f"/api/cua/vnc/{episode_id}",
+        vnc_url=f"ws://localhost:{host_vnc_port}",
     )
 
 
@@ -285,22 +319,39 @@ async def get_cua_episode(
         raise HTTPException(status_code=503, detail="Trajectory store not available")
 
     episodes = store.query_episodes(episode_id=episode_id)
-    if not episodes:
-        raise HTTPException(status_code=404, detail=f"Episode {episode_id} not found")
+    if episodes:
+        ep = episodes[0]
+        return CUAEpisodeInfo(
+            episode_id=ep["episode_id"],
+            task_name=ep["task_name"],
+            outcome=ep["outcome"],
+            score=ep.get("score"),
+            review_notes=ep.get("review_notes"),
+            step_count=ep.get("step_count", 0),
+            duration_ms=ep.get("duration_ms", 0.0),
+            started_at=ep.get("started_at", 0.0),
+            ended_at=ep.get("ended_at"),
+            episode_type=ep.get("episode_type", "cua"),
+        )
 
-    ep = episodes[0]
-    return CUAEpisodeInfo(
-        episode_id=ep["episode_id"],
-        task_name=ep["task_name"],
-        outcome=ep["outcome"],
-        score=ep.get("score"),
-        review_notes=ep.get("review_notes"),
-        step_count=ep.get("step_count", 0),
-        duration_ms=ep.get("duration_ms", 0.0),
-        started_at=ep.get("started_at", 0.0),
-        ended_at=ep.get("ended_at"),
-        episode_type=ep.get("episode_type", "cua"),
-    )
+    # Episode may still be running (not yet ingested into DB)
+    entry = _active_episodes.get(episode_id)
+    if entry is not None:
+        task = entry.get("task")
+        return CUAEpisodeInfo(
+            episode_id=episode_id,
+            task_name=task.name if task else "",
+            outcome="running",
+            score=None,
+            review_notes=None,
+            step_count=0,
+            duration_ms=0.0,
+            started_at=0.0,
+            ended_at=None,
+            episode_type="cua",
+        )
+
+    raise HTTPException(status_code=404, detail=f"Episode {episode_id} not found")
 
 
 # ---------------------------------------------------------------------------
@@ -366,6 +417,11 @@ async def score_cua_episode(
     if not updated:
         raise HTTPException(status_code=404, detail=f"Episode {episode_id} not found")
 
+    # Signal the manual agent to stop so the sandbox gets cleaned up
+    entry = _active_episodes.get(episode_id)
+    if entry and "agent" in entry:
+        entry["agent"].stop()
+
     next_ep = store.query_next_unreviewed(current_episode_id=episode_id)
     next_episode_id = next_ep["episode_id"] if next_ep else None
 
@@ -399,40 +455,18 @@ async def vnc_proxy(
         await websocket.close(code=4404, reason=f"Episode {episode_id} not active")
         return
 
-    sandbox = entry["sandbox"]
-    container_name = sandbox._config.sandbox_id
+    # Connect to x11vnc via the host-mapped port on localhost.
+    # The proxy does WS-to-TCP bridging: noVNC sends RFB over WebSocket,
+    # the proxy strips WS framing and forwards raw RFB to x11vnc (TCP).
+    host_vnc_port = entry.get("host_vnc_port", 5900)
 
-    # Resolve container's internal IP via docker inspect
     try:
-        result = subprocess.run(
-            [
-                "docker",
-                "inspect",
-                "--format={{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
-                container_name,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        container_ip = result.stdout.strip()
-    except Exception as exc:
-        log.error("vnc_proxy_inspect_failed", episode_id=episode_id, error=str(exc))
-        await websocket.close(code=4500, reason="Failed to resolve container IP")
-        return
-
-    if not container_ip:
-        await websocket.close(code=4404, reason="Container IP not found")
-        return
-
-    # Open TCP connection to container's websockify port
-    try:
-        reader, writer = await asyncio.open_connection(container_ip, 6080)
+        reader, writer = await asyncio.open_connection("127.0.0.1", host_vnc_port)
     except Exception as exc:
         log.error(
             "vnc_proxy_tcp_connect_failed",
             episode_id=episode_id,
-            container_ip=container_ip,
+            port=host_vnc_port,
             error=str(exc),
         )
         await websocket.close(code=4500, reason="Failed to connect to VNC server")
@@ -441,7 +475,7 @@ async def vnc_proxy(
     log.info(
         "vnc_proxy_connected",
         episode_id=episode_id,
-        container_ip=container_ip,
+        port=host_vnc_port,
     )
 
     # -- Bidirectional proxy tasks -------------------------------------------
@@ -453,8 +487,10 @@ async def vnc_proxy(
                 data = await websocket.receive_bytes()
                 writer.write(data)
                 await writer.drain()
-        except (WebSocketDisconnect, Exception):
-            pass
+        except WebSocketDisconnect:
+            log.debug("vnc_proxy_browser_disconnected", episode_id=episode_id)
+        except Exception as exc:
+            log.warning("vnc_proxy_browser_error", episode_id=episode_id, error=str(exc), type=type(exc).__name__)
         finally:
             writer.close()
 
@@ -464,10 +500,13 @@ async def vnc_proxy(
             while True:
                 data = await reader.read(65536)
                 if not data:
+                    log.debug("vnc_proxy_container_eof", episode_id=episode_id)
                     break
                 await websocket.send_bytes(data)
-        except (WebSocketDisconnect, Exception):
-            pass
+        except WebSocketDisconnect:
+            log.debug("vnc_proxy_ws_disconnected_during_relay", episode_id=episode_id)
+        except Exception as exc:
+            log.warning("vnc_proxy_container_error", episode_id=episode_id, error=str(exc), type=type(exc).__name__)
 
     try:
         browser_task = asyncio.create_task(browser_to_container())

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import {
-  ArrowLeft,
+  AlertCircle,
   ChevronLeft,
   ChevronRight,
   Pause,
@@ -11,7 +11,25 @@ import {
 } from 'lucide-react'
 import { useHotkeys } from 'react-hotkeys-hook'
 
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb'
+import { Button } from '@/components/ui/button'
+import { Slider } from '@/components/ui/slider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { DiffViewer, type FileDiffEntry } from '@/components/DiffViewer'
 import {
   ResizableHandle,
@@ -334,51 +352,76 @@ function PlaybackControls({
       <div className="flex items-center gap-3">
         {/* Playback buttons */}
         <div className="flex items-center gap-0.5">
-          <button
-            type="button"
-            title="First step"
-            onClick={onFirst}
-            disabled={currentStep === 0}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            <SkipBack className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            title="Previous step"
-            onClick={onPrev}
-            disabled={currentStep === 0}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            <ChevronLeft className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            title={playing ? 'Pause' : 'Play'}
-            onClick={playing ? onPause : onPlay}
-            disabled={totalSteps === 0}
-            className="p-1.5 rounded-md bg-foreground text-background hover:bg-foreground/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
-          </button>
-          <button
-            type="button"
-            title="Next step"
-            onClick={onNext}
-            disabled={currentStep >= totalSteps - 1}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            <ChevronRight className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            title="Last step"
-            onClick={onLast}
-            disabled={currentStep >= totalSteps - 1}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            <SkipForward className="size-3.5" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={onFirst}
+                disabled={currentStep === 0}
+              >
+                <SkipBack className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>First step (Home)</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={onPrev}
+                disabled={currentStep === 0}
+              >
+                <ChevronLeft className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Previous (k / Left)</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="default"
+                size="icon"
+                className="size-7"
+                onClick={playing ? onPause : onPlay}
+                disabled={totalSteps === 0}
+              >
+                {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{playing ? 'Pause' : 'Play'} (Space)</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={onNext}
+                disabled={currentStep >= totalSteps - 1}
+              >
+                <ChevronRight className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Next (j / Right)</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={onLast}
+                disabled={currentStep >= totalSteps - 1}
+              >
+                <SkipForward className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Last step (End)</TooltipContent>
+          </Tooltip>
         </div>
 
         {/* Step counter */}
@@ -387,34 +430,30 @@ function PlaybackControls({
         </span>
 
         {/* Speed selector */}
-        <div className="ml-auto flex items-center gap-0.5 bg-muted rounded-md p-0.5">
+        <ToggleGroup
+          type="single"
+          value={String(speed)}
+          onValueChange={(v) => { if (v) onSpeedChange(Number(v) as Speed) }}
+          size="sm"
+          variant="outline"
+          className="ml-auto"
+        >
           {SPEEDS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => onSpeedChange(s)}
-              className={cn(
-                'px-2 py-0.5 rounded-sm text-xs transition-colors',
-                speed === s
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
+            <ToggleGroupItem key={s} value={String(s)} className="px-2 py-0.5 text-xs">
               {s}x
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       </div>
 
       {/* Timeline scrubber */}
-      <input
-        type="range"
+      <Slider
         min={0}
         max={Math.max(0, totalSteps - 1)}
-        value={currentStep}
-        onChange={(e) => onScrub(Number(e.target.value))}
-        className="w-full h-1.5 accent-foreground cursor-pointer"
+        value={[currentStep]}
+        onValueChange={([v]) => onScrub(v)}
         disabled={totalSteps === 0}
+        className="w-full"
       />
     </div>
   )
@@ -665,16 +704,25 @@ export default function EpisodeReplay() {
     return (
       <div className="flex flex-col h-screen bg-background">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border/50">
-          <Link
-            to={`/runs/${episodeId}`}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="size-4" />
-            Back
-          </Link>
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link to={`/runs/${episodeId}`}>Run</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Replay</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
         </div>
-        <div className="flex items-center justify-center flex-1">
-          <p className="text-destructive text-sm">{fetchError}</p>
+        <div className="flex items-center justify-center flex-1 p-6">
+          <Alert variant="destructive" className="max-w-md">
+            <AlertCircle className="size-4" />
+            <AlertDescription>{fetchError}</AlertDescription>
+          </Alert>
         </div>
       </div>
     )
@@ -725,19 +773,19 @@ export default function EpisodeReplay() {
       {/* Header bar                                                          */}
       {/* ------------------------------------------------------------------ */}
       <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-border/50 min-w-0">
-        <Link
-          to={`/runs/${episodeId}`}
-          className="shrink-0 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="size-4" />
-          Back
-        </Link>
-
-        <span className="text-border">|</span>
-
-        <span className="text-xs font-mono text-foreground/80 truncate min-w-0">
-          {episodeId}
-        </span>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to={`/runs/${episodeId}`}>Run</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage className="font-mono text-xs truncate max-w-[200px]">{episodeId}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
         {episode.task_name && (
           <span className="hidden sm:block text-xs text-muted-foreground truncate">
@@ -746,9 +794,9 @@ export default function EpisodeReplay() {
         )}
 
         {isCUA && (
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
+          <Badge variant="outline" className="text-[10px] font-mono bg-blue-500/15 text-blue-400 border-blue-500/30">
             CUA
-          </span>
+          </Badge>
         )}
 
         <span className="ml-auto text-[10px] text-muted-foreground/50 font-mono hidden md:block">
@@ -780,8 +828,9 @@ export default function EpisodeReplay() {
                 <>
                   {/* Full-size screenshot */}
                   {(() => {
-                    const path = currentSpan.observation['screenshot_path']
-                    const src = typeof path === 'string' ? cuaScreenshotUrl(episodeId, path) : null
+                    const rawPath = currentSpan.observation['screenshot_path']
+                    const filename = typeof rawPath === 'string' ? rawPath.split('/').pop() : null
+                    const src = filename ? cuaScreenshotUrl(episodeId, filename) : null
                     return src ? (
                       <img
                         src={src}

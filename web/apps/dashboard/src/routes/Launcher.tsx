@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router'
-import { ChevronDown, Play, ChevronsUpDown, Check, Plus } from 'lucide-react'
+import { AlertCircle, ChevronDown, Play, ChevronsUpDown, Check, Plus } from 'lucide-react'
 
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,6 +31,7 @@ import {
   CommandItem,
 } from '@/components/ui/command'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Textarea } from '@/components/ui/textarea'
 
 import { fetchTasks, createTask, launchRun, type TaskSummary } from '@/lib/api'
 
@@ -400,8 +402,8 @@ export default function Launcher() {
                 <label className="text-sm font-medium text-foreground">
                   Environment Variables
                 </label>
-                <textarea
-                  className="flex min-h-[100px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50"
+                <Textarea
+                  className="min-h-[100px]"
                   placeholder={'KEY=VALUE\nANOTHER_KEY=another_value'}
                   value={envVarsRaw}
                   onChange={(e) => setEnvVarsRaw(e.target.value)}
@@ -415,7 +417,10 @@ export default function Launcher() {
 
           {/* Submit error */}
           {submitError && (
-            <p className="text-sm text-destructive">{submitError}</p>
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" />
+              <AlertDescription>{submitError}</AlertDescription>
+            </Alert>
           )}
 
           {/* Run button */}
