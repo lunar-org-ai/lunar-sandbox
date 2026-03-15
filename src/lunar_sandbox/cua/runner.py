@@ -80,6 +80,9 @@ class CUAEpisodeResult:
             ``infra_error`` outcomes; ``None`` for successful terminations.
         jsonl_path: Absolute path to the JSONL trajectory file, or empty
             string if no trajectory directory was configured.
+        score: Reward score in [0.0, 1.0] from :class:`CUARewardEvaluator`,
+            or ``None`` if reward evaluation was skipped (no trajectory dir),
+            evaluation raised an exception, or the task uses manual reward.
     """
 
     episode_id: str
@@ -89,6 +92,7 @@ class CUAEpisodeResult:
     duration_ms: float = 0.0
     error_message: str | None = None
     jsonl_path: str = ""
+    score: float | None = None  # reward score from evaluator
 
 
 class CUAEpisodeRunner:
@@ -185,6 +189,7 @@ class CUAEpisodeRunner:
         outcome = "completed"
         error_message: str | None = None
         duration_ms = 0.0
+        score: float | None = None
 
         # Parse display resolution from task (e.g. "1280x800")
         try:
@@ -299,6 +304,22 @@ class CUAEpisodeRunner:
             if writer is not None:
                 writer.close()
 
+            # Evaluate reward score
+            if episode_dir is not None:
+                try:
+                    from lunar_sandbox.cua.reward import CUARewardEvaluator
+                    evaluator = CUARewardEvaluator()
+                    score = evaluator.evaluate(
+                        self._task,
+                        self._sandbox,
+                        episode_dir,
+                        step_idx,
+                    )
+                    self._log.info("cua_episode_reward", score=score)
+                except Exception as exc:
+                    self._log.warning("cua_episode_reward_error", error=str(exc))
+                    score = None
+
             # Ingest into SQLite
             if episode_dir is not None and self._trajectory_dir is not None:
                 self._ingest_trajectory(
@@ -307,6 +328,7 @@ class CUAEpisodeRunner:
                     outcome=outcome,
                     duration_ms=duration_ms,
                     started_at=start_ts,
+                    score=score,
                 )
 
         self._log.info(
@@ -324,6 +346,7 @@ class CUAEpisodeRunner:
             duration_ms=duration_ms,
             error_message=error_message,
             jsonl_path=str(writer.path) if writer is not None else "",
+            score=score,
         )
 
     def run_sync(self) -> CUAEpisodeResult:
@@ -390,6 +413,7 @@ class CUAEpisodeRunner:
         outcome: str,
         duration_ms: float,
         started_at: float,
+        score: float | None = None,
     ) -> None:
         """Ingest the JSONL trajectory file into the SQLite store.
 
@@ -403,6 +427,7 @@ class CUAEpisodeRunner:
             outcome: Terminal outcome string for the episodes table.
             duration_ms: Total episode wall-clock duration in milliseconds.
             started_at: Episode start time as a Unix timestamp.
+            score: Reward score from evaluator, or None if not available.
         """
         assert self._trajectory_dir is not None  # guarded at call site
 
@@ -422,7 +447,7 @@ class CUAEpisodeRunner:
                         "episode_id": self._episode_id,
                         "task_name": self._task.name,
                         "outcome": outcome,
-                        "score": None,
+                        "score": score,
                         "step_count": step_count,
                         "duration_ms": duration_ms,
                         "started_at": started_at,
