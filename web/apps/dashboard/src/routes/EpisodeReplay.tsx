@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import {
   ArrowLeft,
   ChevronLeft,
@@ -19,7 +19,15 @@ import {
   ResizablePanelGroup,
 } from '@/components/ui/resizable'
 import { Skeleton } from '@/components/ui/skeleton'
-import { fetchEpisode, type EpisodeDetail } from '@/lib/api'
+import { CUAFilmstrip } from '@/components/CUAFilmstrip'
+import { ManualReviewSidebar } from '@/components/ManualReviewSidebar'
+import {
+  fetchEpisode,
+  fetchCUAEpisodeDetail,
+  cuaScreenshotUrl,
+  type EpisodeDetail,
+  type CUAEpisodeInfo,
+} from '@/lib/api'
 import {
   formatDurationMs,
   getActionColor,
@@ -438,6 +446,13 @@ export default function EpisodeReplay() {
   // Interval ref for auto-play
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // CUA-specific state
+  const [isCUA, setIsCUA] = useState(false)
+  const [cuaDetail, setCuaDetail] = useState<CUAEpisodeInfo | null>(null)
+
+  // Navigation (for post-review redirect)
+  const navigate = useNavigate()
+
   // ---------------------------------------------------------------------------
   // Load episode
   // ---------------------------------------------------------------------------
@@ -454,6 +469,14 @@ export default function EpisodeReplay() {
           episodeId,
         )
         setSpans(steps)
+
+        // Detect CUA episode: episode_type field or screenshot_path in any step observation
+        const hasCUAType = (data as unknown as Record<string, unknown>)['episode_type'] === 'cua'
+        const hasScreenshots = steps.some(
+          (s) => typeof s.observation['screenshot_path'] === 'string',
+        )
+        setIsCUA(hasCUAType || hasScreenshots)
+
         setLoading(false)
       })
       .catch((e: Error) => {
@@ -461,6 +484,16 @@ export default function EpisodeReplay() {
         setLoading(false)
       })
   }, [episodeId])
+
+  // Fetch CUA-specific detail (score, review_notes) when episode is identified as CUA
+  useEffect(() => {
+    if (!isCUA || !episodeId) return
+    fetchCUAEpisodeDetail(episodeId)
+      .then(setCuaDetail)
+      .catch(() => {
+        // Non-fatal: sidebar will just show defaults
+      })
+  }, [isCUA, episodeId])
 
   // Clamp currentStep when spans load
   useEffect(() => {
@@ -651,6 +684,41 @@ export default function EpisodeReplay() {
 
   const currentSpan = spans[currentStep] ?? null
 
+  // Determine if this CUA episode has a manual reward (needs review sidebar)
+  const isManualReview = isCUA && (cuaDetail?.score === null || cuaDetail?.score !== undefined)
+  // More precise: show sidebar only when we have cuaDetail and its task uses manual reward.
+  // We infer manual reward if score is null (not yet scored) or already has a score
+  // (could be re-scored). If cuaDetail hasn't loaded yet, we don't show it.
+  const showReviewSidebar = isCUA && cuaDetail !== null
+
+  // Shared playback controls props
+  const playbackControlsProps = {
+    playing,
+    speed,
+    currentStep,
+    totalSteps: spans.length,
+    onPlay: () => setPlaying(true),
+    onPause: () => setPlaying(false),
+    onPrev: () => {
+      setPlaying(false)
+      setCurrentStep((prev) => Math.max(0, prev - 1))
+    },
+    onNext: () => {
+      setPlaying(false)
+      setCurrentStep((prev) => Math.min(spans.length - 1, prev + 1))
+    },
+    onFirst: () => {
+      setPlaying(false)
+      setCurrentStep(0)
+    },
+    onLast: () => {
+      setPlaying(false)
+      setCurrentStep(spans.length - 1)
+    },
+    onSpeedChange: (s: Speed) => setSpeed(s),
+    onScrub: handleScrub,
+  }
+
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
       {/* ------------------------------------------------------------------ */}
@@ -677,75 +745,171 @@ export default function EpisodeReplay() {
           </span>
         )}
 
+        {isCUA && (
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
+            CUA
+          </span>
+        )}
+
         <span className="ml-auto text-[10px] text-muted-foreground/50 font-mono hidden md:block">
           Space: play/pause &nbsp;|&nbsp; &larr;&rarr; / j k: step &nbsp;|&nbsp; Home/End: first/last
         </span>
       </div>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Body: ResizablePanelGroup                                           */}
+      {/* Body: CUA layout or coding layout                                  */}
       {/* ------------------------------------------------------------------ */}
-      <div className="flex-1 min-h-0">
-        <ResizablePanelGroup orientation="horizontal" className="h-full">
-          {/* Left panel: step list */}
-          <ResizablePanel defaultSize={25} minSize={15}>
-            <StepList
-              spans={spans}
-              currentStep={currentStep}
-              onSelect={handleSelectStep}
-            />
-          </ResizablePanel>
+      {isCUA ? (
+        /* ----------------------------------------------------------------
+           CUA Layout:
+           +-------------------------------------+------------------+
+           |  Full screenshot + action card       | ManualReview    |
+           |                                     | Sidebar         |
+           +-------------------------------------+------------------+
+           | [filmstrip thumbnails -- horizontal scroll]            |
+           +-------------------------------------------------------+
+           | PlaybackControls                                       |
+           +-------------------------------------------------------+
+        ---------------------------------------------------------------- */
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          {/* Main area: screenshot viewer + optional review sidebar */}
+          <div className="flex-1 min-h-0 flex overflow-hidden">
+            {/* Screenshot viewer */}
+            <div className="flex-1 min-w-0 overflow-auto p-4 space-y-4">
+              {currentSpan ? (
+                <>
+                  {/* Full-size screenshot */}
+                  {(() => {
+                    const path = currentSpan.observation['screenshot_path']
+                    const src = typeof path === 'string' ? cuaScreenshotUrl(episodeId, path) : null
+                    return src ? (
+                      <img
+                        src={src}
+                        alt={`Step ${currentStep + 1} screenshot`}
+                        className="max-w-full rounded-md border border-border/50 shadow-sm"
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-64 rounded-md border border-border/50 bg-muted/30 text-xs text-muted-foreground">
+                        No screenshot for this step
+                      </div>
+                    )
+                  })()}
 
-          <ResizableHandle withHandle />
-
-          {/* Right panel: playback controls + state panel */}
-          <ResizablePanel defaultSize={75} minSize={40}>
-            <div className="flex flex-col h-full overflow-hidden">
-              {/* Playback controls */}
-              <PlaybackControls
-                playing={playing}
-                speed={speed}
-                currentStep={currentStep}
-                totalSteps={spans.length}
-                onPlay={() => setPlaying(true)}
-                onPause={() => setPlaying(false)}
-                onPrev={() => {
-                  setPlaying(false)
-                  setCurrentStep((prev) => Math.max(0, prev - 1))
-                }}
-                onNext={() => {
-                  setPlaying(false)
-                  setCurrentStep((prev) => Math.min(spans.length - 1, prev + 1))
-                }}
-                onFirst={() => {
-                  setPlaying(false)
-                  setCurrentStep(0)
-                }}
-                onLast={() => {
-                  setPlaying(false)
-                  setCurrentStep(spans.length - 1)
-                }}
-                onSpeedChange={(s) => setSpeed(s)}
-                onScrub={handleScrub}
-              />
-
-              {/* State content */}
-              <div className="flex-1 min-h-0 overflow-hidden">
-                {currentSpan ? (
-                  <StatePanel
-                    span={currentSpan}
-                    episodeId={episodeId}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
-                    {spans.length === 0 ? 'No steps in this episode.' : 'Select a step'}
+                  {/* Action detail card */}
+                  <div className="rounded-md border border-border/50 bg-card/50 p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-semibold text-foreground">
+                        Step {currentStep + 1}
+                      </span>
+                      <span className="text-[10px] font-mono text-muted-foreground">
+                        {currentSpan.action}
+                      </span>
+                      <span className="ml-auto text-[10px] text-muted-foreground">
+                        {formatDurationMs(currentSpan.durationMs)}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                        Input
+                      </p>
+                      <pre className="text-xs font-mono bg-muted/50 text-foreground/80 p-3 rounded-md border border-border/50 overflow-auto max-h-40 whitespace-pre-wrap break-words">
+                        {JSON.stringify(currentSpan.params, null, 2)}
+                      </pre>
+                    </div>
+                    {Object.keys(currentSpan.observation).length > 1 && (
+                      <div className="space-y-2">
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                          Observation
+                        </p>
+                        <pre className="text-xs font-mono bg-muted/50 text-foreground/80 p-3 rounded-md border border-border/50 overflow-auto max-h-40 whitespace-pre-wrap break-words">
+                          {JSON.stringify(
+                            Object.fromEntries(
+                              Object.entries(currentSpan.observation).filter(
+                                ([k]) => k !== 'screenshot_path',
+                              ),
+                            ),
+                            null,
+                            2,
+                          )}
+                        </pre>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
+                  {spans.length === 0 ? 'No steps in this episode.' : 'Select a step'}
+                </div>
+              )}
             </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      </div>
+
+            {/* Manual review sidebar */}
+            {showReviewSidebar && cuaDetail && (
+              <ManualReviewSidebar
+                episodeId={episodeId}
+                existingScore={cuaDetail.score}
+                existingNotes={cuaDetail.review_notes}
+                onScoreSubmitted={(nextId) => {
+                  if (nextId) {
+                    navigate(`/replay/${nextId}`)
+                  }
+                }}
+              />
+            )}
+          </div>
+
+          {/* Filmstrip */}
+          <CUAFilmstrip
+            episodeId={episodeId}
+            steps={spans}
+            currentStep={currentStep}
+            onSelectStep={handleSelectStep}
+          />
+
+          {/* Playback controls */}
+          <PlaybackControls {...playbackControlsProps} />
+        </div>
+      ) : (
+        /* ----------------------------------------------------------------
+           Coding episode layout (unchanged)
+        ---------------------------------------------------------------- */
+        <div className="flex-1 min-h-0">
+          <ResizablePanelGroup orientation="horizontal" className="h-full">
+            {/* Left panel: step list */}
+            <ResizablePanel defaultSize={25} minSize={15}>
+              <StepList
+                spans={spans}
+                currentStep={currentStep}
+                onSelect={handleSelectStep}
+              />
+            </ResizablePanel>
+
+            <ResizableHandle withHandle />
+
+            {/* Right panel: playback controls + state panel */}
+            <ResizablePanel defaultSize={75} minSize={40}>
+              <div className="flex flex-col h-full overflow-hidden">
+                {/* Playback controls */}
+                <PlaybackControls {...playbackControlsProps} />
+
+                {/* State content */}
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  {currentSpan ? (
+                    <StatePanel
+                      span={currentSpan}
+                      episodeId={episodeId}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
+                      {spans.length === 0 ? 'No steps in this episode.' : 'Select a step'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
+      )}
     </div>
   )
 }
