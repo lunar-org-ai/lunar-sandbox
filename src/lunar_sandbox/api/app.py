@@ -23,6 +23,7 @@ from fastapi.exceptions import HTTPException
 from lunar_sandbox.api.errors import generic_exception_handler, http_exception_handler
 from lunar_sandbox.api.routers import (
     batches_router,
+    cua_router,
     episodes_router,
     pool_router,
     runs_router,
@@ -121,12 +122,20 @@ app.add_exception_handler(Exception, generic_exception_handler)  # type: ignore[
 
 # Include domain routers
 app.include_router(batches_router)
+app.include_router(cua_router)
 app.include_router(episodes_router)
 app.include_router(pool_router)
 app.include_router(runs_router)
 app.include_router(sandboxes_router)
 app.include_router(tasks_router)
 app.include_router(telemetry_router)
+
+# Serve noVNC static bundle for air-gapped CUA live view
+import os  # noqa: E402
+_novnc_dir = os.path.join(os.path.dirname(__file__), "static", "novnc")
+if os.path.isdir(_novnc_dir):
+    from starlette.staticfiles import StaticFiles
+    app.mount("/novnc", StaticFiles(directory=_novnc_dir), name="novnc")
 
 
 @app.get("/api/health", response_model=HealthResponse, tags=["health"])
