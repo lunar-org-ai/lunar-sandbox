@@ -9,7 +9,10 @@ Key differences from DockerSandbox:
 - ``create()`` is fully overridden to skip the ``sleep infinity`` entrypoint and
   expose the noVNC port on the host.
 - ``health_check()`` polls all four desktop services using ``docker exec``.
-- ``reset()`` kills open application windows instead of clearing workspace files.
+- ``reset()`` performs full cleanup for evaluation loops: kills all visible
+  windows, force-kills app processes, clears workspace directory, browser
+  profiles, /tmp user files, and downloads.  Verifies 0 visible windows
+  (with one retry) before returning.
 - ``execute()`` prepends ``DISPLAY=...`` to every command so xdotool and maim
   work correctly, and restores state to ``RUNNING`` after each exec call (the
   container keeps running between exec calls).
@@ -64,7 +67,8 @@ class CUASandbox(DockerSandbox):
         sandbox.create()                    # Starts desktop stack
         ok = sandbox.health_check()         # Verifies Xvfb/Openbox/x11vnc/websockify
         result = sandbox.execute("echo hi") # Runs command with DISPLAY set
-        sandbox.reset()                     # Kills app windows, keeps desktop
+        sandbox.reset()                     # Full cleanup: windows, workspace,
+                                            # browser profile, /tmp, downloads
         sandbox.destroy()                   # Removes container and host dirs
     """
 
@@ -320,22 +324,25 @@ class CUASandbox(DockerSandbox):
         return True
 
     def reset(self) -> bool:
-        """Reset the CUA desktop without restarting the container.
+        """Reset the CUA desktop with full cleanup.
 
-        Unlike :meth:`DockerSandbox.reset`, this does **not** clear the
-        workspace directory.  Instead it kills open application windows and
-        verifies the desktop services are still healthy.
+        Performs comprehensive state cleanup for evaluation loops:
+        1. Close all visible windows (xdotool windowclose).
+        2. Force-kill application processes (chromium, firefox, etc.).
+        3. Clear workspace directory (every episode starts empty).
+        4. Clear browser profiles, /tmp user files, and downloads.
+        5. Verify xdotool reports 0 visible windows (retry once).
+        6. Verify desktop services survived via health_check().
 
-        The X11 stack (Xvfb, Openbox, x11vnc, websockify) continues running
-        throughout -- only user-opened application windows are closed.
+        If window verification fails after retry, the sandbox is marked
+        BROKEN and the method returns False.
 
         Transitions: RUNNING/STOPPED -> RESETTING -> RUNNING (success)
                      RUNNING/STOPPED -> RESETTING -> BROKEN  (failure)
 
         Returns:
-            ``True`` if the desktop is healthy and ready for the next episode.
-            ``False`` if the desktop services are unhealthy after the reset
-            (sandbox is now BROKEN).
+            True if the desktop is clean and healthy.
+            False if cleanup or verification failed (sandbox is BROKEN).
         """
         self._require_state(SandboxState.RUNNING, SandboxState.STOPPED)
 
@@ -345,37 +352,59 @@ class CUASandbox(DockerSandbox):
         display = self._cua_config.display
 
         try:
-            # Close all visible windows gracefully via xdotool.
-            # The `|| true` and `2>/dev/null` ensure this never fails even if
-            # no windows are open.
+            # 1. Close all visible windows gracefully
             close_cmd = (
                 f"DISPLAY={display} xdotool search --onlyvisible --name '' "
                 f"| xargs -I{{}} xdotool windowclose {{}} 2>/dev/null || true"
             )
             super().execute(close_cmd, timeout=10)
-            self._state = SandboxState.RUNNING  # Restore after parent sets STOPPED.
+            self._state = SandboxState.RUNNING
+            time.sleep(0.5)
 
-            # Give windows time to close cleanly.
-            time.sleep(1.0)
-
-            # Force-kill stubborn application processes.  Use `|| true` so the
-            # command succeeds even if none of these processes are running.
+            # 2. Force-kill app processes
             pkill_cmd = (
                 "pkill -f chromium || true; "
+                "pkill -f firefox || true; "
                 "pkill -f lxterminal || true; "
                 "pkill -f mousepad || true; "
                 "pkill -f pcmanfm || true"
             )
             super().execute(pkill_cmd, timeout=10)
-            self._state = SandboxState.RUNNING  # Restore after parent sets STOPPED.
+            self._state = SandboxState.RUNNING
+            time.sleep(0.3)
+
+            # 3. Clear workspace (locked: every episode starts empty)
+            workspace = self._config.workspace_dir
+            super().execute(f"rm -rf {workspace}/* 2>/dev/null || true", timeout=5)
+            self._state = SandboxState.RUNNING
+
+            # 4. Clear browser profile, /tmp user files, downloads
+            clear_cmd = (
+                "rm -rf /tmp/chromium* /tmp/.org.chromium* "
+                "$HOME/.config/chromium/Default/Cache "
+                "$HOME/.config/chromium/Default/Cookies* "
+                "$HOME/.config/chromium/Default/History* "
+                "$HOME/.config/chromium/Default/Sessions "
+                "$HOME/.config/chromium/Default/Local\\ Storage "
+                "$HOME/Downloads/* 2>/dev/null || true"
+            )
+            super().execute(clear_cmd, timeout=5)
+            self._state = SandboxState.RUNNING
 
         except Exception as exc:
             self._state = SandboxState.BROKEN
-            self._health.retire(f"cua reset exception during app kill: {exc}")
-            self._log.error("cua_sandbox_reset_kill_error", error=str(exc))
+            self._health.retire(f"cua full reset exception during cleanup: {exc}")
+            self._log.error("cua_sandbox_reset_cleanup_error", error=str(exc))
             return False
 
-        # Verify the desktop services survived the reset.
+        # 5. Verify 0 visible windows (with one retry)
+        if not self._verify_no_windows(retry=True):
+            self._state = SandboxState.BROKEN
+            self._health.retire("windows still visible after CUA full reset")
+            self._log.warning("cua_sandbox_reset_windows_remain")
+            return False
+
+        # 6. Verify desktop services survived
         try:
             healthy = self.health_check()
         except ContainerError as exc:
@@ -384,14 +413,46 @@ class CUASandbox(DockerSandbox):
 
         if not healthy:
             self._state = SandboxState.BROKEN
-            self._health.retire("desktop services unhealthy after CUA reset")
+            self._health.retire("desktop services unhealthy after CUA full reset")
             self._log.warning("cua_sandbox_reset_failed_health")
             return False
 
-        # STATE RESTORATION: health_check() calls execute() which sets state to
-        # STOPPED via the parent.  Restore RUNNING explicitly.
         self._state = SandboxState.RUNNING
-
         self._health.record_reset(True)
         self._log.info("cua_sandbox_reset_complete")
         return True
+
+    def _verify_no_windows(self, *, retry: bool = True) -> bool:
+        """Return True when xdotool reports 0 visible windows.
+
+        Args:
+            retry: If True and windows remain, perform one more aggressive
+                cleanup (windowkill) and re-check.
+
+        Returns:
+            True if 0 visible windows detected, False otherwise.
+        """
+        result = self.execute(
+            "xdotool search --onlyvisible --name '' 2>/dev/null | wc -l",
+            timeout=5,
+        )
+        count_str = result.get("stdout", "0").strip()
+        try:
+            count = int(count_str)
+        except ValueError:
+            count = -1
+
+        if count == 0:
+            return True
+
+        if retry:
+            # Aggressive retry: windowkill remaining windows
+            self.execute(
+                "xdotool search --onlyvisible --name '' "
+                "| xargs -r xdotool windowkill 2>/dev/null || true",
+                timeout=5,
+            )
+            time.sleep(0.5)
+            return self._verify_no_windows(retry=False)
+
+        return False
