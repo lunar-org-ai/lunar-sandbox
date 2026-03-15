@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from lunar_sandbox.cua.runner import CUAEpisodeRunner, CUAEpisodeResult
-from lunar_sandbox.cua.task import CUATask
+from lunar_sandbox.cua.task import CUATask, ScriptReward
 from lunar_sandbox.cua.observation import CUAObservation
 
 
@@ -252,3 +252,108 @@ class TestCUAEpisodeRunner:
                 assert "screenshot_path" in obs_data
             finally:
                 store.close()
+
+
+class TestCUAEpisodeRunnerReward:
+    def test_script_reward_populates_score(self, tmp_path):
+        """Episode with script reward produces CUAEpisodeResult with score."""
+        task = CUATask(
+            instruction="Check result",
+            name="reward-test",
+            reward=ScriptReward(script_path="/check.sh", timeout=10.0),
+        )
+        sandbox = _make_mock_sandbox()
+
+        call_count = 0
+
+        def agent(obs):
+            nonlocal call_count
+            call_count += 1
+            return {"action": "stop"}
+
+        fake_b64 = _make_fake_screenshot_b64()
+
+        with patch("lunar_sandbox.cua.runner.CUAActionHandler") as MockHandler:
+            handler = MockHandler.return_value
+            handler.screenshot.return_value = fake_b64
+            handler.cursor_position.return_value = (0, 0)
+
+            # Patch CUARewardEvaluator at its definition site (lazy import)
+            with patch("lunar_sandbox.cua.reward.CUARewardEvaluator") as MockEval:
+                MockEval.return_value.evaluate.return_value = 0.85
+
+                runner = CUAEpisodeRunner(
+                    task=task,
+                    sandbox=sandbox,
+                    agent=agent,
+                    episode_id="reward-ep",
+                    trajectory_dir=tmp_path,
+                )
+                result = runner.run_sync()
+
+        assert result.outcome == "completed"
+        assert result.score == 0.85
+
+    def test_manual_reward_score_is_none(self, tmp_path):
+        """Episode with manual reward produces score=None."""
+        task = CUATask(instruction="Review me", name="manual-test")
+        sandbox = _make_mock_sandbox()
+
+        def agent(obs):
+            return {"action": "stop"}
+
+        fake_b64 = _make_fake_screenshot_b64()
+
+        with patch("lunar_sandbox.cua.runner.CUAActionHandler") as MockHandler:
+            handler = MockHandler.return_value
+            handler.screenshot.return_value = fake_b64
+            handler.cursor_position.return_value = (0, 0)
+
+            with patch("lunar_sandbox.cua.reward.CUARewardEvaluator") as MockEval:
+                MockEval.return_value.evaluate.return_value = None
+
+                runner = CUAEpisodeRunner(
+                    task=task,
+                    sandbox=sandbox,
+                    agent=agent,
+                    episode_id="manual-ep",
+                    trajectory_dir=tmp_path,
+                )
+                result = runner.run_sync()
+
+        assert result.outcome == "completed"
+        assert result.score is None
+
+    def test_reward_error_does_not_crash_episode(self, tmp_path):
+        """Reward evaluator exception produces score=None, not crash."""
+        task = CUATask(
+            instruction="test",
+            name="error-test",
+            reward=ScriptReward(script_path="/fail.sh"),
+        )
+        sandbox = _make_mock_sandbox()
+
+        def agent(obs):
+            return {"action": "stop"}
+
+        fake_b64 = _make_fake_screenshot_b64()
+
+        with patch("lunar_sandbox.cua.runner.CUAActionHandler") as MockHandler:
+            handler = MockHandler.return_value
+            handler.screenshot.return_value = fake_b64
+            handler.cursor_position.return_value = (0, 0)
+
+            with patch("lunar_sandbox.cua.reward.CUARewardEvaluator") as MockEval:
+                MockEval.return_value.evaluate.side_effect = RuntimeError("boom")
+
+                runner = CUAEpisodeRunner(
+                    task=task,
+                    sandbox=sandbox,
+                    agent=agent,
+                    episode_id="error-ep",
+                    trajectory_dir=tmp_path,
+                )
+                result = runner.run_sync()
+
+        assert result.outcome == "completed"
+        assert result.score is None
