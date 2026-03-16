@@ -1,373 +1,382 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, Link } from 'react-router'
+import { useState, useEffect, useCallback } from "react";
+import { Link, useNavigate } from "react-router";
+import { type ColumnDef, type SortingState } from "@tanstack/react-table";
+import { formatDistanceToNow } from "date-fns";
 import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  getFilteredRowModel,
-  flexRender,
-  type ColumnDef,
-  type SortingState,
-} from '@tanstack/react-table'
-import { formatDistanceToNow } from 'date-fns'
-import { AlertCircle, ArrowUpDown } from 'lucide-react'
+  AlertCircle,
+  ArrowRight,
+  ArrowUpDown,
+  Filter,
+  Rocket,
+} from "lucide-react";
 
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Skeleton } from '@/components/ui/skeleton'
+import { StatusBadge } from "@/components/StatusBadge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { StatusBadge } from '@/components/StatusBadge'
-import { fetchEpisodes, fetchBatches, type EpisodeSummary, type BatchSummary } from '@/lib/api'
-import { cn } from '@/lib/utils'
-import CUALauncher from '@/routes/CUALauncher'
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { DataTable } from "@/components/ui/data-table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  fetchBatches,
+  fetchEpisodes,
+  type BatchSummary,
+  type EpisodeSummary,
+} from "@/lib/api";
+import { cn } from "@/lib/utils";
+import CUALauncher from "@/routes/CUALauncher";
 
 function formatDuration(ms: number): string {
-  if (ms <= 0) return '--'
-  const totalSeconds = Math.floor(ms / 1000)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  if (minutes === 0) return `${seconds}s`
-  return `${minutes}m ${seconds}s`
+  if (ms <= 0) return "--";
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes === 0) return `${seconds}s`;
+  return `${minutes}m ${seconds}s`;
 }
 
 function formatCost(usd: number | null | undefined): string {
-  if (usd == null) return '--'
-  return `$${usd.toFixed(2)}`
+  if (usd == null) return "--";
+  return `$${usd.toFixed(2)}`;
 }
 
-// ---------------------------------------------------------------------------
-// Column definitions
-// ---------------------------------------------------------------------------
-
-function buildColumns(navigate: ReturnType<typeof useNavigate>): ColumnDef<EpisodeSummary>[] {
-  // Prevent unused var warning -- navigate is passed for row click, not per-column
-  void navigate
+function buildColumns(): ColumnDef<EpisodeSummary>[] {
   return [
     {
-      accessorKey: 'task_name',
+      accessorKey: "task_name",
       header: ({ column }) => (
         <Button
           variant="ghost"
           size="sm"
-          className="-ml-3 h-8 font-medium text-muted-foreground/70"
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+          className="-ml-3 h-8 font-medium text-muted-foreground"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
           Task
-          <ArrowUpDown className="ml-1 size-3 opacity-40" />
+          <ArrowUpDown className="ml-1 size-3" />
         </Button>
       ),
       cell: ({ row }) => (
-        <span className="text-sm font-mono text-foreground">{row.getValue('task_name')}</span>
+        <span className="font-mono text-sm">{row.getValue("task_name")}</span>
       ),
     },
     {
-      accessorKey: 'outcome',
-      header: 'Outcome',
+      accessorKey: "outcome",
+      header: "Outcome",
       cell: ({ row }) => (
-        <StatusBadge status={row.getValue('outcome')} type="outcome" />
+        <StatusBadge status={row.getValue("outcome")} type="outcome" />
       ),
     },
     {
-      accessorKey: 'score',
+      accessorKey: "score",
       header: ({ column }) => (
         <Button
           variant="ghost"
           size="sm"
-          className="-ml-3 h-8 font-medium text-muted-foreground/70"
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+          className="-ml-3 h-8 font-medium text-muted-foreground"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
           Score
-          <ArrowUpDown className="ml-1 size-3 opacity-40" />
+          <ArrowUpDown className="ml-1 size-3" />
         </Button>
       ),
       cell: ({ row }) => {
-        const score: number | null = row.getValue('score')
+        const score: number | null = row.getValue("score");
         return (
-          <span className="text-right block tabular-nums">
-            {score != null ? score.toFixed(2) : '--'}
+          <span className="block text-right tabular-nums">
+            {score != null ? score.toFixed(2) : "--"}
           </span>
-        )
+        );
       },
     },
     {
-      accessorKey: 'duration_ms',
+      accessorKey: "duration_ms",
       header: ({ column }) => (
         <Button
           variant="ghost"
           size="sm"
-          className="-ml-3 h-8 font-medium text-muted-foreground/70"
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+          className="-ml-3 h-8 font-medium text-muted-foreground"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
           Duration
-          <ArrowUpDown className="ml-1 size-3 opacity-40" />
+          <ArrowUpDown className="ml-1 size-3" />
         </Button>
       ),
       cell: ({ row }) => (
-        <span className="text-right block tabular-nums text-muted-foreground">{formatDuration(row.getValue('duration_ms'))}</span>
+        <span className="block text-right tabular-nums text-muted-foreground">
+          {formatDuration(row.getValue("duration_ms"))}
+        </span>
       ),
     },
     {
-      accessorKey: 'cost_usd',
+      accessorKey: "cost_usd",
       header: ({ column }) => (
         <Button
           variant="ghost"
           size="sm"
-          className="-ml-3 h-8 font-medium text-muted-foreground/70"
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+          className="-ml-3 h-8 font-medium text-muted-foreground"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
           Cost
-          <ArrowUpDown className="ml-1 size-3 opacity-40" />
+          <ArrowUpDown className="ml-1 size-3" />
         </Button>
       ),
       cell: ({ row }) => (
-        <span className="text-right block tabular-nums text-muted-foreground">{formatCost(row.getValue('cost_usd'))}</span>
+        <span className="block text-right tabular-nums text-muted-foreground">
+          {formatCost(row.getValue("cost_usd"))}
+        </span>
       ),
     },
     {
-      accessorKey: 'started_at',
+      accessorKey: "started_at",
       header: ({ column }) => (
         <Button
           variant="ghost"
           size="sm"
-          className="-ml-3 h-8 font-medium text-muted-foreground/70"
-          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+          className="-ml-3 h-8 font-medium text-muted-foreground"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
           Date
-          <ArrowUpDown className="ml-1 size-3 opacity-40" />
+          <ArrowUpDown className="ml-1 size-3" />
         </Button>
       ),
       cell: ({ row }) => {
-        const ts: number = row.getValue('started_at')
-        if (!ts) return <span className="text-right block text-muted-foreground">--</span>
+        const ts: number = row.getValue("started_at");
+        if (!ts)
+          return (
+            <span className="block text-right text-muted-foreground">--</span>
+          );
         return (
-          <span className="text-right block text-muted-foreground text-xs">
+          <span className="block text-right text-xs text-muted-foreground">
             {formatDistanceToNow(new Date(ts * 1000), { addSuffix: true })}
           </span>
-        )
+        );
       },
     },
-  ]
+  ];
 }
 
-// ---------------------------------------------------------------------------
-// Batches tab
-// ---------------------------------------------------------------------------
-
 function BatchesTab() {
-  const navigate = useNavigate()
-  const [batches, setBatches] = useState<BatchSummary[]>([])
-  const [loadingBatches, setLoadingBatches] = useState(true)
-  const [batchError, setBatchError] = useState<string | null>(null)
+  const navigate = useNavigate();
+  const [batches, setBatches] = useState<BatchSummary[]>([]);
+  const [loadingBatches, setLoadingBatches] = useState(true);
+  const [batchError, setBatchError] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoadingBatches(true)
-    setBatchError(null)
+    setLoadingBatches(true);
+    setBatchError(null);
     fetchBatches({ limit: 50 })
-      .then((data) => {
-        setBatches(data.items)
-      })
+      .then((data) => setBatches(data.items))
       .catch((e) => {
-        setBatchError(e instanceof Error ? e.message : 'Failed to load batches.')
+        setBatchError(
+          e instanceof Error ? e.message : "Failed to load batches.",
+        );
       })
-      .finally(() => setLoadingBatches(false))
-  }, [])
+      .finally(() => setLoadingBatches(false));
+  }, []);
 
   if (loadingBatches) {
     return (
-      <div className="space-y-2 mt-4">
+      <div className="mt-4 space-y-2">
         {Array.from({ length: 5 }).map((_, i) => (
           <Skeleton key={i} className="h-12 w-full" />
         ))}
       </div>
-    )
+    );
   }
 
   if (batchError) {
     return (
-      <Alert variant="destructive" className="mt-4">
+      <Alert variant="destructive" className="mt-4 border-0">
         <AlertCircle className="size-4" />
+        <AlertTitle>Unable to load batches</AlertTitle>
         <AlertDescription>{batchError}</AlertDescription>
       </Alert>
-    )
+    );
   }
 
   if (batches.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center mt-4">
-        <p className="text-muted-foreground text-sm">No batches found.</p>
+      <div className="mt-4 rounded-2xl bg-muted px-6 py-16 text-center">
+        <Badge variant="secondary">No batches</Badge>
+        <p className="mt-4 text-sm text-muted-foreground">No batches found.</p>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="mt-4 space-y-1">
+    <div className="mt-4 space-y-2">
       {batches.map((batch) => {
-        const completed = batch.passed + batch.failed + batch.errors
+        const completed = batch.passed + batch.failed + batch.errors;
         const passRatePct =
-          completed > 0 ? ((batch.passed / completed) * 100).toFixed(1) : '--'
+          completed > 0 ? ((batch.passed / completed) * 100).toFixed(1) : "--";
 
         return (
           <div
             key={batch.batch_id}
             onClick={() => navigate(`/batches/${batch.batch_id}`)}
-            className="flex items-center gap-4 rounded-lg border border-border/50 bg-card/50 px-4 py-3 cursor-pointer hover:bg-accent/50 transition-colors"
+            className="flex cursor-pointer items-center gap-4 rounded-2xl bg-muted px-4 py-3 hover:bg-accent"
           >
-            {/* Batch ID */}
-            <span className="font-mono text-sm text-foreground w-40 truncate shrink-0">
+            <span className="w-40 shrink-0 truncate font-mono text-sm">
               {batch.batch_id.slice(0, 20)}
             </span>
-
-            {/* Benchmark name */}
-            <span className="font-mono text-xs text-muted-foreground flex-1 truncate">
-              {batch.benchmark_name || '--'}
+            <span className="flex-1 truncate font-mono text-xs text-muted-foreground">
+              {batch.benchmark_name || "--"}
             </span>
-
-            {/* Progress */}
-            <span className="text-xs text-muted-foreground shrink-0">
+            <span className="shrink-0 text-xs text-muted-foreground">
               {completed}/{batch.total_tasks} complete
             </span>
-
-            {/* Pass rate */}
-            <span className="text-xs font-mono text-emerald-400 w-16 text-right shrink-0">
-              {passRatePct !== '--' ? `${passRatePct}%` : '--'}
-            </span>
-
-            {/* Started at */}
+            <Badge variant="secondary" className="w-16 justify-center text-xs">
+              {passRatePct !== "--" ? `${passRatePct}%` : "--"}
+            </Badge>
             {batch.started_at > 0 && (
-              <span className="text-xs text-muted-foreground shrink-0">
-                {formatDistanceToNow(new Date(batch.started_at * 1000), { addSuffix: true })}
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {formatDistanceToNow(new Date(batch.started_at * 1000), {
+                  addSuffix: true,
+                })}
               </span>
             )}
           </div>
-        )
+        );
       })}
     </div>
-  )
+  );
 }
 
-// ---------------------------------------------------------------------------
-// Runs page
-// ---------------------------------------------------------------------------
-
-const PAGE_SIZE = 50
+const PAGE_SIZE = 50;
 
 export default function Runs() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
+  const [outcomeFilters, setOutcomeFilters] = useState<Set<string>>(new Set());
+  const [taskSearch, setTaskSearch] = useState("");
+  const [debouncedTask, setDebouncedTask] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [scoreMin, setScoreMin] = useState("");
 
-  // Filter state
-  const [outcomeFilters, setOutcomeFilters] = useState<Set<string>>(new Set())
-  const [taskSearch, setTaskSearch] = useState('')
-  const [debouncedTask, setDebouncedTask] = useState('')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
-  const [scoreMin, setScoreMin] = useState('')
-
-  // Debounce task search
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedTask(taskSearch), 300)
-    return () => clearTimeout(timer)
-  }, [taskSearch])
+    const timer = setTimeout(() => setDebouncedTask(taskSearch), 300);
+    return () => clearTimeout(timer);
+  }, [taskSearch]);
 
-  // Data state
-  const [episodes, setEpisodes] = useState<EpisodeSummary[]>([])
-  const [total, setTotal] = useState(0)
-  const [offset, setOffset] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [episodes, setEpisodes] = useState<EpisodeSummary[]>([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "started_at", desc: true },
+  ]);
 
-  // Table sorting state
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'started_at', desc: true }])
-
-  // Fetch data when filters or pagination change
   const loadEpisodes = useCallback(async () => {
-    setLoading(true)
-    setFetchError(null)
+    setLoading(true);
+    setFetchError(null);
     try {
       const params: Parameters<typeof fetchEpisodes>[0] = {
         offset,
         limit: PAGE_SIZE,
-      }
-      if (debouncedTask) params.task_name = debouncedTask
-      if (outcomeFilters.size > 0) params.outcome = Array.from(outcomeFilters).join(',')
-      if (dateFrom) params.date_from = Math.floor(new Date(dateFrom).getTime() / 1000)
-      if (dateTo) params.date_to = Math.floor(new Date(dateTo).getTime() / 1000)
-      if (scoreMin !== '') params.score_min = parseFloat(scoreMin)
+      };
 
-      // Map TanStack sort state to API params
+      if (debouncedTask) params.task_name = debouncedTask;
+      if (outcomeFilters.size > 0) {
+        params.outcome = Array.from(outcomeFilters).join(",");
+      }
+      if (dateFrom)
+        params.date_from = Math.floor(new Date(dateFrom).getTime() / 1000);
+      if (dateTo)
+        params.date_to = Math.floor(new Date(dateTo).getTime() / 1000);
+      if (scoreMin !== "") params.score_min = parseFloat(scoreMin);
+
       if (sorting.length > 0) {
-        params.sort_by = sorting[0].id
-        params.sort_order = sorting[0].desc ? 'desc' : 'asc'
+        params.sort_by = sorting[0].id;
+        params.sort_order = sorting[0].desc ? "desc" : "asc";
       }
 
-      const data = await fetchEpisodes(params)
-      setEpisodes(data.items)
-      setTotal(data.total)
+      const data = await fetchEpisodes(params);
+      setEpisodes(data.items);
+      setTotal(data.total);
     } catch (e) {
-      setFetchError(e instanceof Error ? e.message : 'Failed to load runs.')
+      setFetchError(e instanceof Error ? e.message : "Failed to load runs.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [debouncedTask, outcomeFilters, dateFrom, dateTo, scoreMin, offset, sorting])
+  }, [
+    debouncedTask,
+    outcomeFilters,
+    dateFrom,
+    dateTo,
+    scoreMin,
+    offset,
+    sorting,
+  ]);
 
   useEffect(() => {
-    loadEpisodes()
-  }, [loadEpisodes])
+    loadEpisodes();
+  }, [loadEpisodes]);
 
-  // Reset to first page when filters change (except offset itself)
   useEffect(() => {
-    setOffset(0)
-  }, [debouncedTask, outcomeFilters, dateFrom, dateTo, scoreMin])
+    setOffset(0);
+  }, [debouncedTask, outcomeFilters, dateFrom, dateTo, scoreMin]);
 
-  // Toggle outcome filter chip
   function toggleOutcome(outcome: string) {
     setOutcomeFilters((prev) => {
-      const next = new Set(prev)
-      if (next.has(outcome)) next.delete(outcome)
-      else next.add(outcome)
-      return next
-    })
+      const next = new Set(prev);
+      if (next.has(outcome)) next.delete(outcome);
+      else next.add(outcome);
+      return next;
+    });
   }
 
-  // Column definitions (stable reference via useMemo-like approach)
-  const columns = buildColumns(navigate)
-
-  const table = useReactTable({
-    data: episodes,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    state: { sorting },
-    onSortingChange: setSorting,
-    manualSorting: true, // server-side sort
-  })
-
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
+  const columns = buildColumns();
+  const activeFilters =
+    outcomeFilters.size +
+    Number(Boolean(taskSearch)) +
+    Number(Boolean(dateFrom)) +
+    Number(Boolean(dateTo)) +
+    Number(Boolean(scoreMin));
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto">
-      {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Run History</h1>
-        <p className="text-sm text-muted-foreground mt-1">Browse and filter past evaluation runs.</p>
-      </div>
+    <div className="mx-auto max-w-6xl space-y-6 p-6">
+      <Card className="gap-0 rounded-3xl bg-secondary text-secondary-foreground">
+        <CardHeader className="gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
+          <div className="space-y-4">
+            <Badge variant="default" className="w-fit">
+              Run archive
+            </Badge>
+            <div className="space-y-2">
+              <CardTitle className="text-3xl tracking-tight">
+                Run History
+              </CardTitle>
+              <CardDescription className="max-w-2xl text-base text-secondary-foreground">
+                Browse recent episodes, inspect batches, and launch new CUA runs
+                from the same workspace.
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="default">{total} total runs</Badge>
+              <Badge variant="default">{activeFilters} active filters</Badge>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 sm:justify-end">
+            <Button asChild variant="default" size="sm">
+              <Link to="/launcher">
+                <Rocket className="size-4" />
+                New Run
+              </Link>
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
 
-      {/* Episodes / Batches / New CUA Episode tabs */}
       <Tabs defaultValue="episodes">
         <TabsList>
           <TabsTrigger value="episodes">Episodes</TabsTrigger>
@@ -375,167 +384,160 @@ export default function Runs() {
           <TabsTrigger value="new-cua">New CUA Episode</TabsTrigger>
         </TabsList>
 
-        {/* Episodes tab */}
         <TabsContent value="episodes">
-          <div className="space-y-4 mt-4">
-            {/* Filter bar */}
-            <div className="flex flex-wrap gap-2 items-center">
-              {/* Outcome chips */}
-              {(['pass', 'fail', 'error'] as const).map((outcome) => (
-                <Button
-                  key={outcome}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => toggleOutcome(outcome)}
-                  className={cn(
-                    'h-7 text-xs border-border/50',
-                    outcomeFilters.has(outcome) && outcome === 'pass' && 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-                    outcomeFilters.has(outcome) && outcome === 'fail' && 'bg-red-500/10 text-red-400 border-red-500/30',
-                    outcomeFilters.has(outcome) && outcome === 'error' && 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-                  )}
-                >
-                  {outcome}
-                </Button>
-              ))}
+          <div className="mt-4 space-y-4">
+            <Card className="gap-0 rounded-2xl">
+              <CardHeader className="pb-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <CardTitle className="text-base">Episode Filters</CardTitle>
+                    <CardDescription>
+                      Narrow results by outcome, task, date, and minimum score.
+                    </CardDescription>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="secondary">
+                      <Filter className="size-3" />
+                      {activeFilters} active
+                    </Badge>
+                    {activeFilters > 0 && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          setOutcomeFilters(new Set());
+                          setTaskSearch("");
+                          setDateFrom("");
+                          setDateTo("");
+                          setScoreMin("");
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(["pass", "fail", "error"] as const).map((outcome) => (
+                      <Label
+                        key={outcome}
+                        className={cn(
+                          "gap-2 rounded-xl bg-muted px-3 py-2 text-xs font-medium capitalize",
+                          outcomeFilters.has(outcome) &&
+                            "bg-secondary text-secondary-foreground",
+                        )}
+                      >
+                        <Checkbox
+                          checked={outcomeFilters.has(outcome)}
+                          onCheckedChange={() => toggleOutcome(outcome)}
+                        />
+                        {outcome}
+                      </Label>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input
+                      type="text"
+                      placeholder="Filter by task..."
+                      value={taskSearch}
+                      onChange={(e) => setTaskSearch(e.target.value)}
+                      className="h-9 w-56 text-sm"
+                    />
+                    <Input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      className="h-9 w-40 text-sm"
+                      title="From date"
+                    />
+                    <Input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      className="h-9 w-40 text-sm"
+                      title="To date"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Min score"
+                      value={scoreMin}
+                      onChange={(e) => setScoreMin(e.target.value)}
+                      step="0.1"
+                      min="0"
+                      max="1"
+                      className="h-9 w-32 text-sm"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-              {/* Task name search */}
-              <Input
-                type="text"
-                placeholder="Filter by task..."
-                value={taskSearch}
-                onChange={(e) => setTaskSearch(e.target.value)}
-                className="h-7 w-48 text-sm"
-              />
-
-              {/* Date range */}
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="h-7 w-36 text-sm"
-                title="From date"
-              />
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="h-7 w-36 text-sm"
-                title="To date"
-              />
-
-              {/* Score threshold */}
-              <Input
-                type="number"
-                placeholder="Min score"
-                value={scoreMin}
-                onChange={(e) => setScoreMin(e.target.value)}
-                step="0.1"
-                min="0"
-                max="1"
-                className="h-7 w-28 text-sm"
-              />
-
-              {/* Clear filters */}
-              {(outcomeFilters.size > 0 || taskSearch || dateFrom || dateTo || scoreMin) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    setOutcomeFilters(new Set())
-                    setTaskSearch('')
-                    setDateFrom('')
-                    setDateTo('')
-                    setScoreMin('')
-                  }}
-                >
-                  Clear
-                </Button>
-              )}
-            </div>
-
-            {/* Error */}
             {fetchError && (
-              <Alert variant="destructive">
+              <Alert variant="destructive" className="border-0">
                 <AlertCircle className="size-4" />
+                <AlertTitle>Unable to load runs</AlertTitle>
                 <AlertDescription>{fetchError}</AlertDescription>
               </Alert>
             )}
 
-            {/* Table */}
             {loading ? (
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-2xl bg-muted p-3">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <Skeleton key={i} className="h-10 w-full" />
                 ))}
               </div>
             ) : episodes.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <p className="text-muted-foreground text-sm">No runs found. Adjust filters or launch a new experiment.</p>
-                <Link
-                  to="/launcher"
-                  className="mt-3 text-sm text-muted-foreground hover:text-foreground underline underline-offset-4 transition-colors"
-                >
-                  Go to Launcher
-                </Link>
+              <div className="rounded-2xl bg-muted px-6 py-16 text-center">
+                <Badge variant="secondary">No results</Badge>
+                <p className="text-sm text-muted-foreground">
+                  No runs found. Adjust filters or launch a new experiment.
+                </p>
+                <div className="mt-4 flex justify-center">
+                  <Button asChild variant="secondary" size="sm">
+                    <Link to="/launcher">
+                      Go to Launcher
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  </Button>
+                </div>
               </div>
             ) : (
               <>
-                <div className="rounded-lg border border-border/50 overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      {table.getHeaderGroups().map((headerGroup) => (
-                        <TableRow key={headerGroup.id} className="border-border/50 hover:bg-transparent">
-                          {headerGroup.headers.map((header) => (
-                            <TableHead key={header.id} className="text-muted-foreground/70">
-                              {header.isPlaceholder
-                                ? null
-                                : flexRender(header.column.columnDef.header, header.getContext())}
-                            </TableHead>
-                          ))}
-                        </TableRow>
-                      ))}
-                    </TableHeader>
-                    <TableBody>
-                      {table.getRowModel().rows.map((row) => {
-                        const episode = row.original
-                        return (
-                          <TableRow
-                            key={row.id}
-                            onClick={() => navigate(`/runs/${episode.episode_id}`)}
-                            className="cursor-pointer hover:bg-accent/50 border-border/50 transition-colors"
-                          >
-                            {row.getVisibleCells().map((cell) => (
-                              <TableCell key={cell.id}>
-                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                              </TableCell>
-                            ))}
-                          </TableRow>
-                        )
-                      })}
-                    </TableBody>
-                  </Table>
+                <div className="rounded-2xl bg-muted p-2">
+                  <DataTable
+                    columns={columns}
+                    data={episodes}
+                    sorting={sorting}
+                    onSortingChange={setSorting}
+                    manualSorting
+                    onRowClick={(row) =>
+                      navigate(`/runs/${row.original.episode_id}`)
+                    }
+                  />
                 </div>
 
-                {/* Pagination */}
-                <div className="flex items-center justify-between text-sm text-muted-foreground pt-2">
+                <div className="flex items-center justify-between pt-2 text-sm text-muted-foreground">
                   <span>
-                    Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}
+                    Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, total)}{" "}
+                    of {total}
                   </span>
                   <div className="flex gap-2">
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      className="h-7"
+                      className="h-8"
                       disabled={offset === 0}
                       onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
                     >
                       Previous
                     </Button>
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
-                      className="h-7"
+                      className="h-8"
                       disabled={offset + PAGE_SIZE >= total}
                       onClick={() => setOffset(offset + PAGE_SIZE)}
                     >
@@ -548,16 +550,14 @@ export default function Runs() {
           </div>
         </TabsContent>
 
-        {/* Batches tab */}
         <TabsContent value="batches">
           <BatchesTab />
         </TabsContent>
 
-        {/* New CUA Episode tab */}
         <TabsContent value="new-cua">
           <CUALauncher />
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }

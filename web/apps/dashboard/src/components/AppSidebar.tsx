@@ -1,5 +1,5 @@
-import { Activity, Command, Download, Home, List, Play } from 'lucide-react'
-import { Link, useLocation } from 'react-router'
+import { Activity, Command, Download, Home, List, Play } from "lucide-react";
+import { Link, useLocation } from "react-router";
 
 import {
   Sidebar,
@@ -12,34 +12,40 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-} from '@/components/ui/sidebar'
-import { Separator } from '@/components/ui/separator'
+} from "@/components/ui/sidebar";
+import { Badge } from "@/components/ui/badge";
 
 const navItems = [
-  { title: 'Home', url: '/', icon: Home },
-  { title: 'New Run', url: '/launcher', icon: Play },
-  { title: 'Runs', url: '/runs', icon: List },
-  { title: 'Pool', url: '/pool', icon: Activity },
-  { title: 'Export', url: '/export', icon: Download },
-]
+  { title: "Home", url: "/", icon: Home },
+  { title: "New Run", url: "/launcher", icon: Play },
+  { title: "Runs", url: "/runs", icon: List },
+  { title: "Pool", url: "/pool", icon: Activity },
+  { title: "Export", url: "/export", icon: Download },
+];
 
 export function AppSidebar() {
-  const location = useLocation()
+  const location = useLocation();
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar
+      collapsible="icon"
+      className="group-data-[variant=sidebar]:border-0"
+    >
       <SidebarHeader>
-        <div className="flex items-center gap-2.5 px-2 py-1.5">
+        <div className="flex items-center gap-2 px-2 py-2">
           <div className="size-6 rounded-lg bg-foreground flex items-center justify-center shrink-0">
             <span className="text-xs font-bold text-background">L</span>
           </div>
-          <span className="font-semibold text-sm tracking-tight text-foreground truncate">LunarEngine</span>
+          <span className="font-semibold text-sm truncate">LunarEngine</span>
+          <Badge variant="secondary" className="text-xs ml-auto">
+            Live
+          </Badge>
         </div>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+          <SidebarGroupLabel className="text-xs uppercase tracking-wide">
             Navigation
           </SidebarGroupLabel>
           <SidebarMenu>
@@ -62,24 +68,23 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <Separator className="mb-2" />
         <div className="px-2 pb-2 space-y-1 group-data-[collapsible=icon]:hidden">
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground/50">
-            <kbd className="inline-flex items-center gap-0.5 rounded border border-border/50 bg-muted px-1 py-0.5 font-mono text-[10px]">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <kbd className="inline-flex items-center gap-0.5 rounded bg-secondary px-1.5 py-0.5 font-mono text-xs text-secondary-foreground">
               <Command className="size-2.5" />K
             </kbd>
-            <span>Search</span>
+            <span>Open command menu</span>
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground/50">
-            <kbd className="inline-flex items-center rounded border border-border/50 bg-muted px-1 py-0.5 font-mono text-[10px]">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <kbd className="inline-flex items-center rounded bg-secondary px-1.5 py-0.5 font-mono text-xs text-secondary-foreground">
               ?
             </kbd>
-            <span>Shortcuts</span>
+            <span>View shortcuts</span>
           </div>
         </div>
       </SidebarFooter>
 
       <SidebarRail />
     </Sidebar>
-  )
+  );
 }

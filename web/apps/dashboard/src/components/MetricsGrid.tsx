@@ -1,38 +1,26 @@
-import { MetricCard } from '@/components/MetricCard'
-import type { MetricKey, MetricsRecord } from '@/hooks/useMetricsStream'
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+import { MetricCard } from "@/components/MetricCard";
+import type { MetricKey, MetricsRecord } from "@/hooks/useMetricsStream";
 
 const METRIC_CONFIGS: Array<{
-  key: MetricKey
-  name: string
-  unit: string
+  key: MetricKey;
+  name: string;
+  unit: string;
 }> = [
-  { key: 'allocate_latency', name: 'Allocate Latency', unit: 'ms' },
-  { key: 'reset_latency', name: 'Reset Latency', unit: 'ms' },
-  { key: 'episode_duration', name: 'Episode Duration', unit: 'ms' },
-  { key: 'cache_hit_rate', name: 'Cache Hit Rate', unit: '%' },
-]
-
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
+  { key: "allocate_latency", name: "Allocate Latency", unit: "ms" },
+  { key: "reset_latency", name: "Reset Latency", unit: "ms" },
+  { key: "episode_duration", name: "Episode Duration", unit: "ms" },
+  { key: "cache_hit_rate", name: "Cache Hit Rate", unit: "%" },
+];
 
 export interface MetricsGridProps {
-  metrics: MetricsRecord
+  metrics: MetricsRecord;
 }
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 
 export function MetricsGrid({ metrics }: MetricsGridProps) {
   return (
-    <div className="grid grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       {METRIC_CONFIGS.map(({ key, name, unit }) => {
-        const metricState = metrics[key]
+        const metricState = metrics[key];
         return (
           <MetricCard
             key={key}
@@ -42,8 +30,8 @@ export function MetricsGrid({ metrics }: MetricsGridProps) {
             current={metricState.current}
             values={metricState.values}
           />
-        )
+        );
       })}
     </div>
-  )
+  );
 }

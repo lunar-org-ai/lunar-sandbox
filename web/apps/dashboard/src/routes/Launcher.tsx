@@ -1,151 +1,155 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router'
-import { AlertCircle, ChevronDown, Play, ChevronsUpDown, Check, Plus } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router";
+import { AlertCircle, ChevronDown, Play, Plus, Rocket } from "lucide-react";
 
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
+} from "@/components/ui/select";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from '@/components/ui/collapsible'
+} from "@/components/ui/collapsible";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 import {
-  Command,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandItem,
-} from '@/components/ui/command'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Textarea } from '@/components/ui/textarea'
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldSet,
+} from "@/components/ui/field";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 
-import { fetchTasks, createTask, launchRun, type TaskSummary } from '@/lib/api'
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+import { fetchTasks, createTask, launchRun, type TaskSummary } from "@/lib/api";
 
 function parseEnvVars(raw: string): Record<string, string> | undefined {
-  const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean)
-  if (lines.length === 0) return undefined
-  const result: Record<string, string> = {}
+  const lines = raw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return undefined;
+  const result: Record<string, string> = {};
   for (const line of lines) {
-    const eqIdx = line.indexOf('=')
-    if (eqIdx === -1) continue
-    const key = line.slice(0, eqIdx).trim()
-    const val = line.slice(eqIdx + 1).trim()
-    if (key) result[key] = val
+    const eqIdx = line.indexOf("=");
+    if (eqIdx === -1) continue;
+    const key = line.slice(0, eqIdx).trim();
+    const val = line.slice(eqIdx + 1).trim();
+    if (key) result[key] = val;
   }
-  return Object.keys(result).length > 0 ? result : undefined
+  return Object.keys(result).length > 0 ? result : undefined;
 }
 
-// ---------------------------------------------------------------------------
-// Launcher page
-// ---------------------------------------------------------------------------
-
 export default function Launcher() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
-  // Task combobox state
-  const [tasks, setTasks] = useState<TaskSummary[]>([])
-  const [tasksLoading, setTasksLoading] = useState(true)
-  const [tasksError, setTasksError] = useState<string | null>(null)
-  const [comboOpen, setComboOpen] = useState(false)
-  const [selectedTask, setSelectedTask] = useState<string>('')
+  const [tasks, setTasks] = useState<TaskSummary[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [tasksError, setTasksError] = useState<string | null>(null);
+  const [selectedTask, setSelectedTask] = useState<string>("");
 
-  // Core params
-  const [model, setModel] = useState('')
-  const [parallelism, setParallelism] = useState('1')
+  const [model, setModel] = useState("");
+  const [parallelism, setParallelism] = useState("1");
 
-  // Advanced params
-  const [advancedOpen, setAdvancedOpen] = useState(false)
-  const [cpuCores, setCpuCores] = useState('')
-  const [memoryMb, setMemoryMb] = useState('')
-  const [timeout, setTimeout_] = useState('')
-  const [envVarsRaw, setEnvVarsRaw] = useState('')
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [cpuCores, setCpuCores] = useState("");
+  const [memoryMb, setMemoryMb] = useState("");
+  const [timeout, setTimeout_] = useState("");
+  const [envVarsRaw, setEnvVarsRaw] = useState("");
 
-  // New task form
-  const [showNewTask, setShowNewTask] = useState(false)
-  const [newTaskName, setNewTaskName] = useState('')
-  const [newTaskInstructions, setNewTaskInstructions] = useState('')
-  const [newTaskTestCommand, setNewTaskTestCommand] = useState('')
-  const [newTaskSaving, setNewTaskSaving] = useState(false)
-  const [newTaskError, setNewTaskError] = useState<string | null>(null)
+  const [showNewTask, setShowNewTask] = useState(false);
+  const [newTaskName, setNewTaskName] = useState("");
+  const [newTaskInstructions, setNewTaskInstructions] = useState("");
+  const [newTaskTestCommand, setNewTaskTestCommand] = useState("");
+  const [newTaskSaving, setNewTaskSaving] = useState(false);
+  const [newTaskError, setNewTaskError] = useState<string | null>(null);
 
-  // Submission state
-  const [loading, setLoading] = useState(false)
-  const [taskError, setTaskError] = useState<string | null>(null)
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false);
+  const [taskError, setTaskError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const loadTasks = useCallback(() => {
-    setTasksLoading(true)
+    setTasksLoading(true);
     fetchTasks({ limit: 100 })
       .then((data) => {
-        setTasks(data.items)
-        setTasksLoading(false)
+        setTasks(data.items);
+        setTasksLoading(false);
       })
       .catch((e: Error) => {
-        setTasksError(e.message)
-        setTasksLoading(false)
-      })
-  }, [])
+        setTasksError(e.message);
+        setTasksLoading(false);
+      });
+  }, []);
 
-  // Fetch tasks on mount
   useEffect(() => {
-    loadTasks()
-  }, [loadTasks])
+    loadTasks();
+  }, [loadTasks]);
 
   async function handleCreateTask() {
     if (!newTaskName.trim()) {
-      setNewTaskError('Task name is required.')
-      return
+      setNewTaskError("Task name is required.");
+      return;
     }
-    setNewTaskSaving(true)
-    setNewTaskError(null)
+    setNewTaskSaving(true);
+    setNewTaskError(null);
     try {
       await createTask({
         name: newTaskName.trim(),
         instructions: newTaskInstructions.trim() || undefined,
         test_command: newTaskTestCommand.trim() || undefined,
-      })
-      setNewTaskName('')
-      setNewTaskInstructions('')
-      setNewTaskTestCommand('')
-      setShowNewTask(false)
-      loadTasks()
+      });
+      setNewTaskName("");
+      setNewTaskInstructions("");
+      setNewTaskTestCommand("");
+      setShowNewTask(false);
+      loadTasks();
     } catch (e) {
-      setNewTaskError(e instanceof Error ? e.message : 'Failed to create task.')
+      setNewTaskError(
+        e instanceof Error ? e.message : "Failed to create task.",
+      );
     } finally {
-      setNewTaskSaving(false)
+      setNewTaskSaving(false);
     }
   }
 
-  const selectedTaskObj = tasks.find((t) => t.name === selectedTask)
+  const selectedTaskObj = useMemo(
+    () => tasks.find((task) => task.name === selectedTask) ?? null,
+    [tasks, selectedTask],
+  );
 
   async function handleRun() {
-    setTaskError(null)
-    setSubmitError(null)
+    setTaskError(null);
+    setSubmitError(null);
 
     if (!selectedTask) {
-      setTaskError('Please select a task before running.')
-      return
+      setTaskError("Please select a task before running.");
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
     try {
       const response = await launchRun({
         task_name: selectedTask,
@@ -155,282 +159,285 @@ export default function Launcher() {
         env_vars: parseEnvVars(envVarsRaw),
         cpu_cores: cpuCores ? parseInt(cpuCores, 10) : undefined,
         memory_mb: memoryMb ? parseInt(memoryMb, 10) : undefined,
-      })
-      navigate(`/runs/${response.episode_id}`)
+      });
+      navigate(`/runs/${response.episode_id}`);
     } catch (e) {
-      setSubmitError(e instanceof Error ? e.message : 'Failed to launch run.')
-      setLoading(false)
+      setSubmitError(e instanceof Error ? e.message : "Failed to launch run.");
+      setLoading(false);
     }
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Launch Experiment</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Select a task, configure parameters, and start an evaluation run.
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-3xl space-y-6 p-6">
+      <Card className="gap-0 rounded-3xl bg-secondary text-secondary-foreground">
+        <CardHeader className="gap-4">
+          <Badge variant="default" className="w-fit">
+            <Rocket className="size-3" />
+            Experiment
+          </Badge>
+          <div className="space-y-1">
+            <CardTitle className="text-3xl tracking-tight">
+              Launch Experiment
+            </CardTitle>
+            <CardDescription className="text-base text-secondary-foreground">
+              Choose a task, configure execution options, and start a run.
+            </CardDescription>
+          </div>
+        </CardHeader>
+      </Card>
 
-      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+      <Card className="gap-0 rounded-2xl">
         <CardHeader className="pb-4">
-          <CardTitle className="text-base font-medium">Configuration</CardTitle>
+          <CardTitle className="text-base">Run Configuration</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Task selector */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Task</label>
-
-            {tasksLoading ? (
-              <Skeleton className="h-9 w-full" />
-            ) : tasksError ? (
-              <p className="text-sm text-destructive">Failed to load tasks: {tasksError}</p>
-            ) : (
-              <Popover open={comboOpen} onOpenChange={setComboOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={comboOpen}
-                    className="w-full justify-between font-normal"
+          <FieldSet>
+            <FieldGroup>
+              <Field data-invalid={Boolean(taskError)}>
+                <FieldLabel>Task</FieldLabel>
+                {tasksLoading ? (
+                  <Skeleton className="h-9 w-full" />
+                ) : tasksError ? (
+                  <FieldError>Failed to load tasks: {tasksError}</FieldError>
+                ) : (
+                  <Combobox
+                    items={tasks}
+                    value={selectedTaskObj}
+                    onValueChange={(value) =>
+                      setSelectedTask(value?.name ?? "")
+                    }
+                    itemToStringValue={(item) => item.name}
                   >
-                    {selectedTaskObj ? (
-                      <span className="font-mono text-sm">{selectedTaskObj.name}</span>
-                    ) : (
-                      <span className="text-muted-foreground">Select a task...</span>
-                    )}
-                    <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search tasks..." />
-                    <CommandList>
-                      <CommandEmpty>No tasks found.</CommandEmpty>
-                      {tasks.map((task) => (
-                        <CommandItem
-                          key={task.name}
-                          value={task.name}
-                          onSelect={(value) => {
-                            setSelectedTask(value === selectedTask ? '' : value)
-                            setComboOpen(false)
+                    <ComboboxInput placeholder="Select a task" showClear />
+                    <ComboboxContent>
+                      <ComboboxEmpty>No tasks found.</ComboboxEmpty>
+                      <ComboboxList>
+                        {(task) => (
+                          <ComboboxItem key={task.name} value={task}>
+                            <div className="flex min-w-0 flex-col">
+                              <span className="font-mono text-sm">
+                                {task.name}
+                              </span>
+                              {task.instructions && (
+                                <span className="truncate text-xs text-muted-foreground">
+                                  {task.instructions}
+                                </span>
+                              )}
+                            </div>
+                          </ComboboxItem>
+                        )}
+                      </ComboboxList>
+                    </ComboboxContent>
+                  </Combobox>
+                )}
+                <FieldDescription>Select the task to execute.</FieldDescription>
+                <FieldError>{taskError ?? undefined}</FieldError>
+              </Field>
+
+              {!tasksLoading && !tasksError && !showNewTask && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowNewTask(true)}
+                >
+                  <Plus className="size-4" />
+                  New Task
+                </Button>
+              )}
+
+              {showNewTask && (
+                <Card className="gap-0 rounded-2xl">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Create Task</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <FieldGroup>
+                      <Field
+                        data-invalid={Boolean(
+                          newTaskError && !newTaskName.trim(),
+                        )}
+                      >
+                        <FieldLabel htmlFor="new-task-name">Name</FieldLabel>
+                        <Input
+                          id="new-task-name"
+                          placeholder="my-eval-task"
+                          value={newTaskName}
+                          onChange={(e) => setNewTaskName(e.target.value)}
+                        />
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="new-task-instructions">
+                          Instructions
+                        </FieldLabel>
+                        <Input
+                          id="new-task-instructions"
+                          placeholder="What should the agent do?"
+                          value={newTaskInstructions}
+                          onChange={(e) =>
+                            setNewTaskInstructions(e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="new-task-test-command">
+                          Test Command
+                        </FieldLabel>
+                        <Input
+                          id="new-task-test-command"
+                          placeholder="pytest tests/"
+                          value={newTaskTestCommand}
+                          onChange={(e) =>
+                            setNewTaskTestCommand(e.target.value)
+                          }
+                        />
+                      </Field>
+                      <FieldError>{newTaskError ?? undefined}</FieldError>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={handleCreateTask}
+                          disabled={newTaskSaving}
+                        >
+                          {newTaskSaving ? "Saving..." : "Create"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setShowNewTask(false);
+                            setNewTaskError(null);
                           }}
                         >
-                          <Check
-                            className={
-                              selectedTask === task.name
-                                ? 'opacity-100 size-4 shrink-0'
-                                : 'opacity-0 size-4 shrink-0'
-                            }
-                          />
-                          <div className="flex flex-col min-w-0">
-                            <span className="font-mono text-sm">{task.name}</span>
-                            {task.instructions && (
-                              <span className="text-xs text-muted-foreground truncate">
-                                {task.instructions}
-                              </span>
-                            )}
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            )}
+                          Cancel
+                        </Button>
+                      </div>
+                    </FieldGroup>
+                  </CardContent>
+                </Card>
+              )}
 
-            {!tasksLoading && !tasksError && !showNewTask && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs text-muted-foreground"
-                onClick={() => setShowNewTask(true)}
-              >
-                <Plus className="size-3 mr-1" />
-                New Task
-              </Button>
-            )}
+              <Field>
+                <FieldLabel htmlFor="model">Model</FieldLabel>
+                <Input
+                  id="model"
+                  type="text"
+                  placeholder="gpt-4o"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                />
+                <FieldDescription>
+                  Leave empty to use the backend default model.
+                </FieldDescription>
+              </Field>
 
-            {showNewTask && (
-              <div className="space-y-3 rounded-md border border-border p-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium">Name</label>
-                  <Input
-                    placeholder="e.g., my-eval-task"
-                    value={newTaskName}
-                    onChange={(e) => setNewTaskName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium">Instructions</label>
-                  <Input
-                    placeholder="What should the agent do?"
-                    value={newTaskInstructions}
-                    onChange={(e) => setNewTaskInstructions(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium">Test Command</label>
-                  <Input
-                    placeholder="e.g., pytest tests/"
-                    value={newTaskTestCommand}
-                    onChange={(e) => setNewTaskTestCommand(e.target.value)}
-                  />
-                </div>
-                {newTaskError && (
-                  <p className="text-xs text-destructive">{newTaskError}</p>
-                )}
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={handleCreateTask} disabled={newTaskSaving}>
-                    {newTaskSaving ? 'Saving...' : 'Create'}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setShowNewTask(false)
-                      setNewTaskError(null)
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
+              <Field>
+                <FieldLabel htmlFor="parallelism">Parallelism</FieldLabel>
+                <Select value={parallelism} onValueChange={setParallelism}>
+                  <SelectTrigger id="parallelism" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["1", "2", "4", "8", "16"].map((n) => (
+                      <SelectItem key={n} value={n}>
+                        {n}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldDescription>
+                  Number of sandbox executions running in parallel.
+                </FieldDescription>
+              </Field>
+            </FieldGroup>
+          </FieldSet>
 
-            {taskError && (
-              <p className="text-sm text-destructive">{taskError}</p>
-            )}
-          </div>
-
-          {/* Model */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Model</label>
-            <Input
-              type="text"
-              placeholder="e.g., gpt-4o, claude-sonnet-4-20250514"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Leave blank to use the backend default model.
-            </p>
-          </div>
-
-          {/* Parallelism */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Parallelism</label>
-            <Select value={parallelism} onValueChange={setParallelism}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {['1', '2', '4', '8', '16'].map((n) => (
-                  <SelectItem key={n} value={n}>
-                    {n}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Number of parallel sandbox executions.
-            </p>
-          </div>
-
-          {/* Advanced options */}
           <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" className="flex items-center gap-1 px-0 text-sm text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" size="sm">
                 <ChevronDown
-                  className={`size-4 transition-transform ${advancedOpen ? 'rotate-180' : ''}`}
+                  className={`size-4 transition-transform ${advancedOpen ? "rotate-180" : ""}`}
                 />
                 Advanced Options
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-4 pt-4">
-              {/* CPU Cores */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
-                  CPU Cores
-                </label>
-                <Input
-                  type="number"
-                  placeholder="e.g., 2"
-                  value={cpuCores}
-                  onChange={(e) => setCpuCores(e.target.value)}
-                  min={1}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Number of CPU cores per sandbox. Leave blank for engine default.
-                </p>
-              </div>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="cpu-cores">CPU Cores</FieldLabel>
+                  <Input
+                    id="cpu-cores"
+                    type="number"
+                    placeholder="2"
+                    value={cpuCores}
+                    onChange={(e) => setCpuCores(e.target.value)}
+                    min={1}
+                  />
+                  <FieldDescription>
+                    CPU cores per sandbox. Leave empty for default.
+                  </FieldDescription>
+                </Field>
 
-              {/* Memory (MB) */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
-                  Memory (MB)
-                </label>
-                <Input
-                  type="number"
-                  placeholder="e.g., 1024"
-                  value={memoryMb}
-                  onChange={(e) => setMemoryMb(e.target.value)}
-                  min={64}
-                  step={64}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Memory limit in megabytes per sandbox. Leave blank for engine default.
-                </p>
-              </div>
+                <Field>
+                  <FieldLabel htmlFor="memory-mb">Memory (MB)</FieldLabel>
+                  <Input
+                    id="memory-mb"
+                    type="number"
+                    placeholder="1024"
+                    value={memoryMb}
+                    onChange={(e) => setMemoryMb(e.target.value)}
+                    min={64}
+                    step={64}
+                  />
+                  <FieldDescription>
+                    Memory limit per sandbox in megabytes.
+                  </FieldDescription>
+                </Field>
 
-              {/* Timeout */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
-                  Timeout (seconds)
-                </label>
-                <Input
-                  type="number"
-                  placeholder="1800"
-                  value={timeout}
-                  onChange={(e) => setTimeout_(e.target.value)}
-                  min={1}
-                />
-              </div>
+                <Field>
+                  <FieldLabel htmlFor="timeout">Timeout (seconds)</FieldLabel>
+                  <Input
+                    id="timeout"
+                    type="number"
+                    placeholder="1800"
+                    value={timeout}
+                    onChange={(e) => setTimeout_(e.target.value)}
+                    min={1}
+                  />
+                </Field>
 
-              {/* Env vars */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
-                  Environment Variables
-                </label>
-                <Textarea
-                  className="min-h-[100px]"
-                  placeholder={'KEY=VALUE\nANOTHER_KEY=another_value'}
-                  value={envVarsRaw}
-                  onChange={(e) => setEnvVarsRaw(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  One KEY=VALUE pair per line.
-                </p>
-              </div>
+                <Field>
+                  <FieldLabel htmlFor="env-vars">
+                    Environment Variables
+                  </FieldLabel>
+                  <Textarea
+                    id="env-vars"
+                    className="min-h-24"
+                    placeholder={"KEY=VALUE\nANOTHER_KEY=another_value"}
+                    value={envVarsRaw}
+                    onChange={(e) => setEnvVarsRaw(e.target.value)}
+                  />
+                  <FieldDescription>
+                    Use one KEY=VALUE pair per line.
+                  </FieldDescription>
+                </Field>
+              </FieldGroup>
             </CollapsibleContent>
           </Collapsible>
 
-          {/* Submit error */}
           {submitError && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="border-0">
               <AlertCircle className="size-4" />
               <AlertDescription>{submitError}</AlertDescription>
             </Alert>
           )}
 
-          {/* Run button */}
           <Button
             className="w-full"
             onClick={handleRun}
             disabled={loading || tasksLoading}
           >
             {loading ? (
-              'Launching...'
+              "Launching..."
             ) : (
               <>
                 <Play className="size-4 mr-2" />
@@ -441,5 +448,5 @@ export default function Launcher() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

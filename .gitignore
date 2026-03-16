@@ -23,3 +23,5 @@ trajectories/
 # Test notebooks (may contain API keys)
 test_total.ipynb
 usecase_real.ipynb
+
+.venv

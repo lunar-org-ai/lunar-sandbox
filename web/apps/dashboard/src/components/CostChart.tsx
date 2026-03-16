@@ -1,123 +1,151 @@
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 
 export interface CostDataPoint {
-  elapsed_s: number
-  cumulative_usd: number
+  elapsed_s: number;
+  cumulative_usd: number;
 }
 
 export interface CostChartProps {
-  data: CostDataPoint[]
-  inputTokens: number
-  outputTokens: number
-  totalCost: number
+  data: CostDataPoint[];
+  inputTokens: number;
+  outputTokens: number;
+  totalCost: number;
 }
 
-// ---------------------------------------------------------------------------
-// Formatters
-// ---------------------------------------------------------------------------
+const chartConfig = {
+  cumulative_usd: {
+    label: "Cost",
+    color: "var(--color-chart-1)",
+  },
+} satisfies ChartConfig;
 
-function formatMinutes(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  return `${m}m`
+const USD_FORMATTER = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 4,
+  maximumFractionDigits: 4,
+});
+
+function formatElapsed(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}m${s > 0 ? `${s}s` : ""}` : `${seconds}s`;
 }
 
 function formatUsdAxis(value: number): string {
-  return `$${value.toFixed(3)}`
+  return `$${value.toFixed(3)}`;
 }
 
-function formatUsdTooltip(value: number): string {
-  return `$${value.toFixed(4)}`
-}
-
-const USD_FORMATTER = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 4,
-  maximumFractionDigits: 4,
-})
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
-export function CostChart({ data, inputTokens, outputTokens, totalCost }: CostChartProps) {
+export function CostChart({
+  data,
+  inputTokens,
+  outputTokens,
+  totalCost,
+}: CostChartProps) {
   return (
-    <div className="space-y-4">
-      {/* Summary stats */}
-      <div className="flex flex-wrap items-baseline gap-6">
-        {/* Running cost counter */}
-        <div
-          className="text-3xl font-mono font-bold tabular-nums"
-        >
-          {USD_FORMATTER.format(totalCost)}
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-start gap-8">
+        <div className="space-y-0.5">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+            Total Cost
+          </p>
+          <p className="text-3xl font-mono font-bold tabular-nums">
+            {USD_FORMATTER.format(totalCost)}
+          </p>
         </div>
-
-        {/* Token breakdown */}
-        <div className="text-sm text-muted-foreground">
-          Input:{' '}
-          <span className="text-foreground font-mono tabular-nums">
+        <div className="space-y-0.5">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+            Input Tokens
+          </p>
+          <p className="text-xl font-mono font-semibold tabular-nums">
             {inputTokens.toLocaleString()}
-          </span>{' '}
-          tokens | Output:{' '}
-          <span className="text-foreground font-mono tabular-nums">
+          </p>
+        </div>
+        <div className="space-y-0.5">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+            Output Tokens
+          </p>
+          <p className="text-xl font-mono font-semibold tabular-nums">
             {outputTokens.toLocaleString()}
-          </span>{' '}
-          tokens
+          </p>
         </div>
       </div>
 
-      {/* Chart or placeholder */}
       {data.length === 0 ? (
-        <div className="rounded-lg border border-border/50 bg-card/50 p-6 text-center h-[240px] flex items-center justify-center">
+        <div className="flex h-48 items-center justify-center rounded-lg border bg-muted/20">
           <p className="text-sm text-muted-foreground">
-            Cost data will appear as episodes complete
+            Cost data will appear as the episode progresses
           </p>
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={240}>
-          <LineChart data={data}>
+        <ChartContainer config={chartConfig} className="h-52 w-full">
+          <AreaChart
+            data={data}
+            margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
+          >
+            <defs>
+              <linearGradient id="costGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop
+                  offset="5%"
+                  stopColor="var(--color-chart-1)"
+                  stopOpacity={0.25}
+                />
+                <stop
+                  offset="95%"
+                  stopColor="var(--color-chart-1)"
+                  stopOpacity={0}
+                />
+              </linearGradient>
+            </defs>
+            <CartesianGrid
+              vertical={false}
+              stroke="var(--color-border)"
+              strokeOpacity={0.5}
+            />
             <XAxis
               dataKey="elapsed_s"
-              tickFormatter={formatMinutes}
-              stroke="hsl(0 0% 20%)"
-              tick={{ fill: 'hsl(0 0% 55%)', fontSize: 11 }}
+              tickFormatter={formatElapsed}
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
             />
             <YAxis
               tickFormatter={formatUsdAxis}
-              stroke="hsl(0 0% 20%)"
-              tick={{ fill: 'hsl(0 0% 55%)', fontSize: 11 }}
-              width={55}
+              tickLine={false}
+              axisLine={false}
+              width={52}
             />
-            <Tooltip
-              formatter={(value) => [formatUsdTooltip(typeof value === 'number' ? value : 0), 'Cost']}
-              contentStyle={{
-                background: 'hsl(0 0% 7%)',
-                border: '1px solid hsl(0 0% 15%)',
-                borderRadius: '0.5rem',
-              }}
-              labelStyle={{ color: 'hsl(0 0% 55%)' }}
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  formatter={(value) => [
+                    `$${(typeof value === "number" ? value : 0).toFixed(4)}`,
+                    "cumulative_usd",
+                  ]}
+                  labelFormatter={(label) =>
+                    `${formatElapsed(Number(label))} elapsed`
+                  }
+                />
+              }
             />
-            <Line
+            <Area
               type="monotone"
               dataKey="cumulative_usd"
-              stroke="hsl(0 0% 93%)"
-              strokeWidth={1.5}
+              stroke="var(--color-chart-1)"
+              strokeWidth={2}
+              fill="url(#costGradient)"
               dot={false}
+              activeDot={{ r: 4, strokeWidth: 0 }}
             />
-          </LineChart>
-        </ResponsiveContainer>
+          </AreaChart>
+        </ChartContainer>
       )}
     </div>
-  )
+  );
 }

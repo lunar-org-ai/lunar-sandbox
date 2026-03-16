@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams, Link, useNavigate, useLocation } from 'react-router'
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useParams, Link, useNavigate, useLocation } from "react-router";
 import {
   Eye,
   MousePointer,
@@ -8,21 +8,21 @@ import {
   Square,
   ArrowLeft,
   Monitor,
-} from 'lucide-react'
+} from "lucide-react";
 
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { NoVNCViewer } from '@/components/NoVNCViewer'
-import { fetchCUAEpisodeDetail, type CUAEpisodeInfo } from '@/lib/api'
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { NoVNCViewer } from "@/components/NoVNCViewer";
+import { fetchCUAEpisodeDetail, type CUAEpisodeInfo } from "@/lib/api";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function formatElapsed(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -30,52 +30,52 @@ function formatElapsed(seconds: number): string {
 // ---------------------------------------------------------------------------
 
 export default function CUALiveView() {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const episodeId = id ?? ''
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const episodeId = id ?? "";
 
   // VNC URL passed from launcher via navigation state
-  const vncUrl = (location.state as { vncUrl?: string } | null)?.vncUrl ?? ''
+  const vncUrl = (location.state as { vncUrl?: string } | null)?.vncUrl ?? "";
 
   // Connection state
-  const [connected, setConnected] = useState(false)
+  const [connected, setConnected] = useState(false);
 
   // Episode info state
-  const [episodeInfo, setEpisodeInfo] = useState<CUAEpisodeInfo | null>(null)
-  const [complete, setComplete] = useState(false)
+  const [episodeInfo, setEpisodeInfo] = useState<CUAEpisodeInfo | null>(null);
+  const [complete, setComplete] = useState(false);
 
   // Toolbar state
-  const [viewOnly, setViewOnly] = useState(true)
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [viewOnly, setViewOnly] = useState(true);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   // Refs for timers
-  const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ---------------------------------------------------------------------------
   // Episode polling (every 3 seconds)
   // ---------------------------------------------------------------------------
   const pollEpisode = useCallback(async () => {
-    if (!episodeId) return
+    if (!episodeId) return;
     try {
-      const info = await fetchCUAEpisodeDetail(episodeId)
-      setEpisodeInfo(info)
-      if (info.outcome && info.outcome !== 'running') {
-        setComplete(true)
+      const info = await fetchCUAEpisodeDetail(episodeId);
+      setEpisodeInfo(info);
+      if (info.outcome && info.outcome !== "running") {
+        setComplete(true);
       }
     } catch {
       // Silently ignore poll errors
     }
-  }, [episodeId])
+  }, [episodeId]);
 
   useEffect(() => {
-    pollEpisode()
-    pollTimerRef.current = setInterval(pollEpisode, 3000)
+    pollEpisode();
+    pollTimerRef.current = setInterval(pollEpisode, 3000);
     return () => {
-      if (pollTimerRef.current) clearInterval(pollTimerRef.current)
-    }
-  }, [pollEpisode])
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    };
+  }, [pollEpisode]);
 
   // ---------------------------------------------------------------------------
   // Elapsed timer (starts when connected)
@@ -83,30 +83,30 @@ export default function CUALiveView() {
   useEffect(() => {
     if (connected && !complete) {
       elapsedTimerRef.current = setInterval(() => {
-        setElapsedSeconds((s) => s + 1)
-      }, 1000)
+        setElapsedSeconds((s) => s + 1);
+      }, 1000);
     } else {
       if (elapsedTimerRef.current) {
-        clearInterval(elapsedTimerRef.current)
-        elapsedTimerRef.current = null
+        clearInterval(elapsedTimerRef.current);
+        elapsedTimerRef.current = null;
       }
     }
     return () => {
-      if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current)
-    }
-  }, [connected, complete])
+      if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+    };
+  }, [connected, complete]);
 
   // ---------------------------------------------------------------------------
   // Fullscreen
   // ---------------------------------------------------------------------------
-  const viewerContainerRef = useRef<HTMLDivElement | null>(null)
+  const viewerContainerRef = useRef<HTMLDivElement | null>(null);
 
   function handleFullscreen() {
-    if (!viewerContainerRef.current) return
+    if (!viewerContainerRef.current) return;
     if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {})
+      document.exitFullscreen().catch(() => {});
     } else {
-      viewerContainerRef.current.requestFullscreen().catch(() => {})
+      viewerContainerRef.current.requestFullscreen().catch(() => {});
     }
   }
 
@@ -114,7 +114,7 @@ export default function CUALiveView() {
   // Stop episode (navigate away)
   // ---------------------------------------------------------------------------
   function handleStop() {
-    navigate('/runs')
+    navigate("/runs");
   }
 
   // ---------------------------------------------------------------------------
@@ -122,15 +122,18 @@ export default function CUALiveView() {
   // ---------------------------------------------------------------------------
   function handleScreenshot() {
     // Screenshot API not yet wired -- placeholder
-    window.open(`/api/cua/episodes/${encodeURIComponent(episodeId)}/screenshot`, '_blank')
+    window.open(
+      `/api/cua/episodes/${encodeURIComponent(episodeId)}/screenshot`,
+      "_blank",
+    );
   }
 
   // ---------------------------------------------------------------------------
   // Derived values
   // ---------------------------------------------------------------------------
-  const wsUrl = vncUrl
-  const isRunning = !complete
-  const statusLabel = complete ? 'Complete' : 'Running'
+  const wsUrl = vncUrl;
+  const isRunning = !complete;
+  const statusLabel = complete ? "Complete" : "Running";
 
   // ---------------------------------------------------------------------------
   // Render
@@ -138,7 +141,7 @@ export default function CUALiveView() {
   return (
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
       {/* Toolbar */}
-      <div className="shrink-0 flex items-center gap-3 px-4 h-12 border-b border-border/50 bg-background/90 backdrop-blur-sm">
+      <div className="shrink-0 flex items-center gap-3 px-4 h-12 bg-background">
         {/* Back */}
         <Link
           to="/runs"
@@ -148,21 +151,16 @@ export default function CUALiveView() {
           Runs
         </Link>
 
-        <div className="w-px h-4 bg-border/50 mx-1" />
-
         {/* Episode ID */}
         <div className="flex items-center gap-1.5">
           <Monitor className="size-4 text-muted-foreground" />
-          <span className="font-mono text-xs text-muted-foreground truncate max-w-[140px]">
-            {episodeId || '--'}
+          <span className="font-mono text-xs text-muted-foreground truncate max-w-35">
+            {episodeId || "--"}
           </span>
         </div>
 
         {/* Status badge */}
-        <Badge
-          variant={isRunning ? 'default' : 'secondary'}
-          className={isRunning ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : ''}
-        >
+        <Badge variant={isRunning ? "secondary" : "default"}>
           {statusLabel}
         </Badge>
 
@@ -189,9 +187,9 @@ export default function CUALiveView() {
         <Button
           variant="ghost"
           size="sm"
-          className={`h-8 gap-1.5 text-xs ${!viewOnly ? 'text-amber-400 bg-amber-500/10' : 'text-muted-foreground'}`}
+          className={`h-8 gap-1.5 text-xs ${!viewOnly ? "text-foreground bg-muted" : "text-muted-foreground"}`}
           onClick={() => setViewOnly((v) => !v)}
-          title={viewOnly ? 'Enable interaction' : 'Switch to view-only'}
+          title={viewOnly ? "Enable interaction" : "Switch to view-only"}
         >
           {viewOnly ? (
             <>
@@ -231,7 +229,7 @@ export default function CUALiveView() {
 
       {/* Desktop viewer */}
       <div ref={viewerContainerRef} className="flex-1 relative overflow-hidden">
-        {episodeId && (
+        {episodeId && wsUrl && (
           <NoVNCViewer
             wsUrl={wsUrl}
             viewOnly={viewOnly}
@@ -241,25 +239,47 @@ export default function CUALiveView() {
           />
         )}
 
+        {/* No VNC URL available */}
+        {episodeId && !wsUrl && (
+          <div className="flex h-full items-center justify-center">
+            <div className="text-center space-y-2">
+              <p className="text-sm font-medium">No VNC session available</p>
+              <p className="text-xs text-muted-foreground">
+                The desktop session URL was not provided. Try launching a new
+                episode.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Episode complete overlay */}
         {complete && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-10">
-            <div className="bg-card border border-border rounded-xl px-8 py-6 flex flex-col items-center gap-4 shadow-2xl">
-              <div className="w-12 h-12 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-                <Square className="size-5 text-emerald-400" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 z-10">
+            <div className="rounded-2xl bg-card px-8 py-6 flex flex-col items-center gap-4 shadow-2xl">
+              <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
+                <Square className="size-5 text-secondary-foreground" />
               </div>
               <div className="text-center">
-                <p className="font-semibold text-foreground">Episode complete</p>
+                <p className="font-semibold text-foreground">
+                  Episode complete
+                </p>
                 {episodeInfo?.outcome && (
                   <p className="text-sm text-muted-foreground mt-1">
-                    Outcome: <span className="font-mono">{episodeInfo.outcome}</span>
+                    Outcome:{" "}
+                    <span className="font-mono">{episodeInfo.outcome}</span>
                     {episodeInfo.score != null && (
-                      <> &middot; Score: <span className="font-mono">{episodeInfo.score.toFixed(2)}</span></>
+                      <>
+                        {" "}
+                        &middot; Score:{" "}
+                        <span className="font-mono">
+                          {episodeInfo.score.toFixed(2)}
+                        </span>
+                      </>
                     )}
                   </p>
                 )}
               </div>
-              <Button size="sm" onClick={() => navigate('/runs')}>
+              <Button size="sm" onClick={() => navigate("/runs")}>
                 Back to Runs
               </Button>
             </div>
@@ -267,5 +287,5 @@ export default function CUALiveView() {
         )}
       </div>
     </div>
-  )
+  );
 }

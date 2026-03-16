@@ -24,13 +24,11 @@ interface StatTileProps {
 
 function StatTile({ label, value }: StatTileProps) {
   return (
-    <div className="rounded-lg border border-border/50 bg-card/50 px-3 py-2">
-      <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+    <div className="rounded-lg border bg-card px-3 py-2">
+      <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
         {label}
       </div>
-      <div className="text-sm font-mono tabular-nums">
-        {value}
-      </div>
+      <div className="text-sm font-mono tabular-nums">{value}</div>
     </div>
   );
 }
@@ -51,14 +49,14 @@ export function BatchEtaStats({
       : null;
 
   const etaMs = avgMs !== null ? avgMs * remaining : null;
-  const epsPerMin = elapsedSeconds > 0 ? completed / (elapsedSeconds / 60) : null;
+  const epsPerMin =
+    elapsedSeconds > 0 ? completed / (elapsedSeconds / 60) : null;
 
   const etaLabel =
     etaMs !== null && remaining > 0 ? formatDuration(etaMs) : "--";
   const elapsedLabel =
     elapsedSeconds > 0 ? formatDuration(elapsedSeconds * 1000) : "--";
-  const avgLabel =
-    avgMs !== null ? `${(avgMs / 1000).toFixed(1)}s` : "--";
+  const avgLabel = avgMs !== null ? `${(avgMs / 1000).toFixed(1)}s` : "--";
   const rateLabel =
     epsPerMin !== null
       ? epsPerMin < 1

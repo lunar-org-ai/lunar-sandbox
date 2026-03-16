@@ -1,16 +1,16 @@
-import { useState } from 'react'
+import { useState } from "react";
 
-import { scoreCUAEpisode } from '@/lib/api'
+import { scoreCUAEpisode } from "@/lib/api";
 
 // ---------------------------------------------------------------------------
 // ManualReviewSidebar Props
 // ---------------------------------------------------------------------------
 
 interface ManualReviewSidebarProps {
-  episodeId: string
-  existingScore: number | null
-  existingNotes: string | null
-  onScoreSubmitted: (nextEpisodeId: string | null) => void
+  episodeId: string;
+  existingScore: number | null;
+  existingNotes: string | null;
+  onScoreSubmitted: (nextEpisodeId: string | null) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -23,27 +23,33 @@ export function ManualReviewSidebar({
   existingNotes,
   onScoreSubmitted,
 }: ManualReviewSidebarProps) {
-  const [score, setScore] = useState<number>(existingScore ?? 0.5)
-  const [notes, setNotes] = useState<string>(existingNotes ?? '')
-  const [loading, setLoading] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [score, setScore] = useState<number>(existingScore ?? 0.5);
+  const [notes, setNotes] = useState<string>(existingNotes ?? "");
+  const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const alreadyReviewed = existingScore !== null
+  const alreadyReviewed = existingScore !== null;
 
   async function handleSubmit() {
-    setSubmitError(null)
-    setLoading(true)
+    setSubmitError(null);
+    setLoading(true);
     try {
-      const response = await scoreCUAEpisode(episodeId, score, notes || undefined)
-      onScoreSubmitted(response.next_episode_id)
+      const response = await scoreCUAEpisode(
+        episodeId,
+        score,
+        notes || undefined,
+      );
+      onScoreSubmitted(response.next_episode_id);
     } catch (e) {
-      setSubmitError(e instanceof Error ? e.message : 'Failed to submit score.')
-      setLoading(false)
+      setSubmitError(
+        e instanceof Error ? e.message : "Failed to submit score.",
+      );
+      setLoading(false);
     }
   }
 
   return (
-    <div className="space-y-4 p-4 border-l border-border/50 w-64 shrink-0 overflow-y-auto">
+    <div className="space-y-4 p-4 border-l w-64 shrink-0 overflow-y-auto">
       {/* Header */}
       <div>
         <h3 className="text-sm font-semibold text-foreground">Manual Review</h3>
@@ -56,7 +62,9 @@ export function ManualReviewSidebar({
       {alreadyReviewed && (
         <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400">
           <span className="font-medium">Previously scored:</span>
-          <span className="font-mono tabular-nums">{existingScore!.toFixed(2)}</span>
+          <span className="font-mono tabular-nums">
+            {existingScore!.toFixed(2)}
+          </span>
         </div>
       )}
 
@@ -95,9 +103,7 @@ export function ManualReviewSidebar({
       </div>
 
       {/* Submit error */}
-      {submitError && (
-        <p className="text-xs text-destructive">{submitError}</p>
-      )}
+      {submitError && <p className="text-xs text-destructive">{submitError}</p>}
 
       {/* Submit button */}
       <button
@@ -106,8 +112,12 @@ export function ManualReviewSidebar({
         disabled={loading}
         className="w-full inline-flex items-center justify-center rounded-md bg-foreground text-background text-xs font-medium h-9 px-4 transition-colors hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {loading ? 'Submitting...' : alreadyReviewed ? 'Update Score' : 'Submit Score'}
+        {loading
+          ? "Submitting..."
+          : alreadyReviewed
+            ? "Update Score"
+            : "Submit Score"}
       </button>
     </div>
-  )
+  );
 }

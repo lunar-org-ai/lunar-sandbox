@@ -18,6 +18,7 @@ make setup
 ```
 
 This runs:
+
 1. `uv sync` — installs Python dependencies
 2. `cd web && pnpm install` — installs frontend dependencies
 3. `docker build` — builds the `lunar-cua:latest` Docker image
@@ -32,6 +33,7 @@ make dev
 ```
 
 This launches:
+
 - **API**: `uvicorn lunar_sandbox.api.app:app --reload` on `http://localhost:8000`
 - **Dashboard**: `vite --port 3000` on `http://localhost:3000`
 
@@ -97,7 +99,7 @@ This exports the OpenAPI spec and generates `web/packages/types/src/api.d.ts`.
 
 ## Project Structure
 
-```
+```text
 .
 ├── src/lunar_sandbox/         # Python backend
 │   ├── api/                   # FastAPI app, routers, schemas
@@ -130,9 +132,9 @@ make clean
 
 ## Tech Stack
 
-| Layer    | Stack |
-|----------|-------|
-| Backend  | Python 3.12, FastAPI, Pydantic, uvicorn, structlog |
+| Layer    | Stack                                                   |
+| -------- | ------------------------------------------------------- |
+| Backend  | Python 3.12, FastAPI, Pydantic, uvicorn, structlog      |
 | Frontend | React 19, Vite 6, TypeScript, Tailwind CSS 4, shadcn/ui |
-| Testing  | pytest, pytest-cov, ESLint |
-| Tooling  | uv, pnpm, Docker |
+| Testing  | pytest, pytest-cov, ESLint                              |
+| Tooling  | uv, pnpm, Docker                                        |

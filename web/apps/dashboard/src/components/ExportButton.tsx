@@ -1,13 +1,13 @@
-import { Download, FileJson, FileSpreadsheet } from 'lucide-react'
+import { Download, FileJson, FileSpreadsheet } from "lucide-react";
 
-import { Button } from '@/components/ui/button'
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { downloadCsv, downloadJson } from '@/lib/export-utils'
+} from "@/components/ui/dropdown-menu";
+import { downloadCsv, downloadJson } from "@/lib/export-utils";
 
 // ---------------------------------------------------------------------------
 // ExportButton — reusable export dropdown with JSON/CSV format picker
@@ -15,12 +15,12 @@ import { downloadCsv, downloadJson } from '@/lib/export-utils'
 
 interface ExportButtonProps {
   /** Full data object exported as JSON */
-  data: unknown
+  data: unknown;
   /** Base filename (no extension) */
-  filename: string
+  filename: string;
   /** Rows for CSV export; if omitted, CSV option is disabled */
-  csvRows?: Record<string, unknown>[]
-  disabled?: boolean
+  csvRows?: Record<string, unknown>[];
+  disabled?: boolean;
 }
 
 export function ExportButton({
@@ -30,21 +30,21 @@ export function ExportButton({
   disabled = false,
 }: ExportButtonProps) {
   function handleJson() {
-    downloadJson(data, filename)
+    downloadJson(data, filename);
   }
 
   function handleCsv() {
-    if (!csvRows) return
-    downloadCsv(csvRows, filename)
+    if (!csvRows) return;
+    downloadCsv(csvRows, filename);
   }
 
-  const hasCsvRows = csvRows !== undefined && csvRows.length > 0
+  const hasCsvRows = csvRows !== undefined && csvRows.length > 0;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           disabled={disabled}
           className="flex items-center gap-1.5 h-7 text-xs"
@@ -64,5 +64,5 @@ export function ExportButton({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  )
+  );
 }
