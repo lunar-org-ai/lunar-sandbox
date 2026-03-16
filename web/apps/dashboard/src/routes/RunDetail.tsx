@@ -3,7 +3,6 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { format } from "date-fns";
 import {
   AlertCircle,
-  ArrowRight,
   GitBranch,
   LayoutGrid,
   List,
@@ -303,27 +302,23 @@ function RunDetailContent({
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
                 {episode.ended_at != null && (
-                  <Button variant="default" size="sm" className="h-8" asChild>
-                    <Link to={`/replay/${episodeId}`}>
-                      <RotateCcw className="size-3.5" />
-                      Replay
-                    </Link>
-                  </Button>
-                )}
-                <Button variant="default" size="sm" className="h-8" asChild>
-                  <Link to={`/replay/${episodeId}`}>
-                    Open Replay
-                    <ArrowRight className="size-4" />
-                  </Link>
-                </Button>
-                {episode.ended_at != null && (
-                  <ExportButton
-                    data={episode}
-                    filename={`episode-${episodeId}`}
-                    csvRows={[
-                      flattenEpisodeForCsv(episode as Record<string, unknown>),
-                    ]}
-                  />
+                  <>
+                    <Button variant="default" size="sm" className="h-8" asChild>
+                      <Link to={`/replay/${episodeId}`}>
+                        <RotateCcw className="size-3.5" />
+                        Open Replay
+                      </Link>
+                    </Button>
+                    <ExportButton
+                      data={episode}
+                      filename={`episode-${episodeId}`}
+                      csvRows={[
+                        flattenEpisodeForCsv(
+                          episode as Record<string, unknown>,
+                        ),
+                      ]}
+                    />
+                  </>
                 )}
               </div>
             </div>
@@ -372,7 +367,7 @@ function RunDetailContent({
       </div>
 
       {/* Trace card — fills remaining viewport height */}
-      <div className="flex-1 min-h-0 mx-auto w-full max-w-6xl px-6 pb-6">
+      <div className="flex-1 min-h-0 px-6 pb-6">
         <Card className="overflow-hidden p-0 rounded-3xl h-full flex flex-col">
           <CardHeader className="shrink-0 px-4 py-3">
             <div className="flex items-center justify-between">
@@ -433,8 +428,8 @@ function RunDetailContent({
               className="h-full rounded-[inherit] bg-card"
             >
               <ResizablePanel
-                defaultSize={selectedSpan ? 65 : 100}
-                minSize={40}
+                defaultSize={selectedSpan ? 60 : 100}
+                minSize={35}
               >
                 {viewMode === "timeline" && (
                   <TraceTimeline
@@ -485,35 +480,21 @@ function RunDetailContent({
               {selectedSpan && <ResizableHandle withHandle />}
 
               <ResizablePanel
-                defaultSize={35}
-                minSize={20}
+                defaultSize={40}
+                minSize={25}
                 collapsible
                 collapsedSize={0}
                 panelRef={detailPanelRef}
               >
                 {selectedSpan && (
-                  <div className="flex flex-col h-full overflow-hidden">
-                    <div className="shrink-0 flex items-center justify-end px-3 py-2 bg-secondary">
-                      <Link
-                        to={`/replay/${episodeId}?step=${selectedSpan.stepIdx}`}
-                        className="text-xs text-secondary-foreground transition-colors"
-                      >
-                        Open in Replay
-                      </Link>
-                    </div>
-                    <div className="flex-1 min-h-0 overflow-hidden">
-                      <TraceDetailPanel
-                        span={selectedSpan}
-                        episodeStartTs={episode.started_at}
-                        parentDurationMs={
-                          episode.duration_ms > 0
-                            ? episode.duration_ms
-                            : undefined
-                        }
-                        onClose={() => setSelectedSpan(null)}
-                      />
-                    </div>
-                  </div>
+                  <TraceDetailPanel
+                    span={selectedSpan}
+                    episodeStartTs={episode.started_at}
+                    parentDurationMs={
+                      episode.duration_ms > 0 ? episode.duration_ms : undefined
+                    }
+                    onClose={() => setSelectedSpan(null)}
+                  />
                 )}
               </ResizablePanel>
             </ResizablePanelGroup>

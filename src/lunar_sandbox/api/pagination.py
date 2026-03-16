@@ -23,16 +23,16 @@ class PaginationParams(BaseModel):
 
     Attributes:
         offset: Zero-based offset into the result set.
-        limit: Maximum number of items to return (1--100).
+        limit: Maximum number of items to return.
     """
 
     offset: int = Field(default=0, ge=0)
-    limit: int = Field(default=20, ge=1, le=100)
+    limit: int = Field(default=20, ge=1)
 
 
 def pagination_query(
     offset: int = Query(default=0, ge=0, description="Zero-based offset"),
-    limit: int = Query(default=20, ge=1, le=100, description="Max items to return"),
+    limit: int = Query(default=20, ge=1, description="Max items to return"),
 ) -> PaginationParams:
     """FastAPI dependency that extracts pagination from query params."""
     return PaginationParams(offset=offset, limit=limit)

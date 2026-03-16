@@ -127,7 +127,7 @@ class CUATask(BaseModel):
     instruction: str
     start_url: str | None = None
     reward: RewardVariant = Field(default_factory=ManualReward)
-    max_steps: int = 100
+    max_steps: int = 1000
     time_limit: float = 300.0
     resolution: str = "1280x800"
     screenshot_format: str = "jpg"

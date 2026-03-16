@@ -1,71 +1,73 @@
-import { formatDurationMs, getActionColor, type TraceSpan } from '@/lib/trace-utils'
-import { cn } from '@/lib/utils'
+import { ChevronDown, ChevronRight } from "lucide-react";
 
-// ---------------------------------------------------------------------------
-// TraceTimelineRow – label + bar for a single span
-// ---------------------------------------------------------------------------
+import {
+  formatDurationMs,
+  getActionColor,
+  type TraceSpan,
+} from "@/lib/trace-utils";
+import { cn } from "@/lib/utils";
 
 interface TraceTimelineRowBaseProps {
-  span: TraceSpan
-  isSelected: boolean
-  onClick: () => void
+  span: TraceSpan;
+  isSelected: boolean;
+  onClick: () => void;
 }
 
 interface TraceTimelineRowBarProps extends TraceTimelineRowBaseProps {
-  totalMs: number
-  zoom: number
-  isPulsing?: boolean
+  totalMs: number;
+  zoom: number;
+  isPulsing?: boolean;
 }
-
-// ---------------------------------------------------------------------------
-// TraceTimelineRowLabel — left panel: index, action type, duration
-// ---------------------------------------------------------------------------
 
 export function TraceTimelineRowLabel({
   span,
   isSelected,
   onClick,
 }: TraceTimelineRowBaseProps) {
-  const color = getActionColor(span.action)
+  const color = getActionColor(span.action);
 
   return (
     <div
       className={cn(
-        'flex h-8 cursor-pointer items-center gap-1.5 border-b border-zinc-800/50 px-2 text-xs',
-        'hover:bg-zinc-800/60 transition-colors',
-        isSelected && 'bg-zinc-800',
+        "flex h-9 cursor-pointer items-center gap-2 px-2 text-xs transition-colors",
+        "hover:bg-accent",
+        isSelected && "bg-accent",
       )}
       style={{ paddingLeft: `${8 + span.depth * 16}px` }}
       onClick={onClick}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') onClick()
+        if (e.key === "Enter" || e.key === " ") onClick();
       }}
     >
-      {/* Colored action type dot */}
+      {/* Colored action type pill */}
       <span
-        className={cn('inline-block size-2 shrink-0 rounded-full', color.bg)}
+        className={cn("inline-block shrink-0 rounded-sm", color.bg)}
+        style={{ width: 10, height: 10 }}
       />
       {/* Step index */}
-      <span className="shrink-0 font-mono text-zinc-500">
+      <span className="shrink-0 font-mono text-muted-foreground w-6 text-right">
         {span.stepIdx + 1}
       </span>
       {/* Action type name */}
-      <span className="truncate text-zinc-300">{span.action}</span>
+      <span
+        className={cn(
+          "truncate flex-1",
+          isSelected ? "text-foreground font-medium" : "text-foreground",
+        )}
+      >
+        {span.action}
+      </span>
       {/* Duration */}
-      <span className="ml-auto shrink-0 font-mono text-zinc-500">
+      <span className="ml-auto shrink-0 font-mono text-muted-foreground">
         {formatDurationMs(span.durationMs)}
       </span>
     </div>
-  )
+  );
 }
 
-// ---------------------------------------------------------------------------
-// TraceTimelineRowBar — right panel: horizontal duration bar
-// ---------------------------------------------------------------------------
-
-const ERROR_STATUSES = new Set<string>(['error', 'timeout'])
+const ERROR_STATUSES = new Set<string>(["error", "timeout"]);
 
 export function TraceTimelineRowBar({
   span,
@@ -75,57 +77,163 @@ export function TraceTimelineRowBar({
   isPulsing = false,
   onClick,
 }: TraceTimelineRowBarProps) {
-  const color = getActionColor(span.action)
-  const isError = ERROR_STATUSES.has(span.status)
+  const color = getActionColor(span.action);
+  const isError = ERROR_STATUSES.has(span.status);
 
-  // Compute bar position as percentages relative to total duration,
-  // then apply zoom factor so the bar container scales with the header.
-  const leftPct = totalMs > 0 ? (span.startMs / totalMs) * 100 : 0
-  const widthPct = totalMs > 0 ? (span.durationMs / totalMs) * 100 : 0
-
-  // Minimum 2px visual width: we use a min-width style for zero-duration spans.
-  // We keep percentage-based left/width and add minWidth on the bar element itself.
+  const leftPct = totalMs > 0 ? (span.startMs / totalMs) * 100 : 0;
+  const widthPct = totalMs > 0 ? (span.durationMs / totalMs) * 100 : 0;
 
   return (
     <div
       className={cn(
-        'relative flex h-8 cursor-pointer items-center border-b border-zinc-800/50',
-        'hover:bg-zinc-800/30 transition-colors',
-        isSelected && 'bg-zinc-800/50',
+        "relative flex h-9 cursor-pointer items-center transition-colors",
+        "hover:bg-accent",
+        isSelected && "bg-accent",
       )}
       onClick={onClick}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') onClick()
+        if (e.key === "Enter" || e.key === " ") onClick();
       }}
       style={{
-        // Width tracks zoom so bars align with the header
         width: `${zoom * 100}%`,
-        minWidth: '100%',
+        minWidth: "100%",
       }}
     >
       {/* Duration bar */}
       <div
         className={cn(
-          'absolute h-5 rounded-sm',
+          "absolute h-5 rounded",
           color.bg,
-          isError && 'border-2 border-red-500',
-          isSelected ? 'opacity-100 ring-1 ring-white/30' : 'opacity-80 hover:opacity-100',
-          isPulsing && 'animate-pulse',
+          isError && "ring-1 ring-destructive",
+          isSelected && "ring-1 ring-primary",
+          isPulsing && "animate-pulse",
         )}
         style={{
           left: `${leftPct}%`,
           width: `${widthPct}%`,
-          minWidth: 2,
-          ...(isError
-            ? {
-                backgroundImage:
-                  'repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(239,68,68,0.3) 3px, rgba(239,68,68,0.3) 6px)',
-              }
-            : {}),
+          minWidth: 3,
         }}
       />
     </div>
-  )
+  );
+}
+
+export interface SpanGroup {
+  id: string;
+  action: string;
+  spans: TraceSpan[];
+  totalMs: number;
+}
+
+interface GroupLabelProps {
+  group: SpanGroup;
+  isExpanded: boolean;
+  onToggle: () => void;
+}
+
+export function TraceTimelineGroupLabel({
+  group,
+  isExpanded,
+  onToggle,
+}: GroupLabelProps) {
+  const color = getActionColor(group.action);
+  const totalDuration = group.spans.reduce((s, sp) => s + sp.durationMs, 0);
+
+  return (
+    <div
+      className="flex h-9 cursor-pointer items-center gap-2 px-2 text-xs transition-colors hover:bg-accent bg-muted"
+      onClick={onToggle}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onToggle();
+      }}
+    >
+      {/* Expand/collapse icon */}
+      {isExpanded ? (
+        <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
+      ) : (
+        <ChevronRight className="size-3 shrink-0 text-muted-foreground" />
+      )}
+      {/* Colored action type pill */}
+      <span
+        className={cn("inline-block shrink-0 rounded-sm", color.bg)}
+        style={{ width: 10, height: 10 }}
+      />
+      {/* Action type name */}
+      <span className="truncate flex-1 text-foreground font-medium">
+        {group.action}
+      </span>
+      {/* Count badge */}
+      <span className="shrink-0 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] tabular-nums text-secondary-foreground font-semibold">
+        ×{group.spans.length}
+      </span>
+      {/* Total duration */}
+      <span className="shrink-0 font-mono text-muted-foreground">
+        {formatDurationMs(totalDuration)}
+      </span>
+    </div>
+  );
+}
+
+interface GroupBarProps {
+  group: SpanGroup;
+  totalMs: number;
+  zoom: number;
+  isExpanded: boolean;
+  onToggle: () => void;
+}
+
+export function TraceTimelineGroupBar({
+  group,
+  totalMs,
+  zoom,
+  isExpanded,
+  onToggle,
+}: GroupBarProps) {
+  const color = getActionColor(group.action);
+  const firstSpan = group.spans[0]!;
+  const lastSpan = group.spans[group.spans.length - 1]!;
+  const groupStartMs = firstSpan.startMs;
+  const groupEndMs = lastSpan.startMs + lastSpan.durationMs;
+  const groupDurationMs = groupEndMs - groupStartMs;
+
+  const leftPct = totalMs > 0 ? (groupStartMs / totalMs) * 100 : 0;
+  const widthPct = totalMs > 0 ? (groupDurationMs / totalMs) * 100 : 0;
+
+  return (
+    <div
+      className="relative flex h-9 cursor-pointer items-center transition-colors hover:bg-accent bg-muted"
+      onClick={onToggle}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onToggle();
+      }}
+      style={{ width: `${zoom * 100}%`, minWidth: "100%" }}
+    >
+      {/* Group bar */}
+      <div
+        className={cn(
+          "absolute h-5 rounded",
+          color.bg,
+          isExpanded && "ring-1 ring-primary",
+        )}
+        style={{
+          left: `${leftPct}%`,
+          width: `${Math.max(widthPct, 0.5)}%`,
+          minWidth: 6,
+        }}
+      />
+      {/* Count label inside bar */}
+      <span
+        className="absolute text-[9px] font-bold text-white pointer-events-none select-none px-1"
+        style={{ left: `calc(${leftPct}% + 2px)` }}
+      >
+        ×{group.spans.length}
+      </span>
+    </div>
+  );
 }

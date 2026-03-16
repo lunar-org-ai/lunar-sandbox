@@ -84,13 +84,13 @@ function statusColor(status: TraceSpan["status"]): string {
   switch (status) {
     case "success":
     case "completed":
-      return "text-emerald-400";
+      return "text-primary";
     case "error":
-      return "text-red-400";
+      return "text-destructive";
     case "timeout":
-      return "text-amber-400";
+      return "text-muted-foreground";
     case "running":
-      return "text-blue-400";
+      return "text-foreground";
     default:
       return "text-muted-foreground";
   }
@@ -153,8 +153,8 @@ function StepList({ spans, currentStep, onSelect }: StepListProps) {
 
   return (
     <div className="h-full overflow-y-auto bg-background">
-      <div className="px-3 py-2.5 text-xs uppercase tracking-wider text-muted-foreground font-medium bg-muted">
-        Steps ({spans.length})
+      <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold bg-muted">
+        {spans.length} steps
       </div>
       {spans.map((span, idx) => {
         const color = getActionColor(span.action);
@@ -166,7 +166,7 @@ function StepList({ spans, currentStep, onSelect }: StepListProps) {
             type="button"
             onClick={() => onSelect(idx)}
             className={cn(
-              "w-full text-left px-3 py-2 flex items-start gap-2 hover:bg-accent transition-colors",
+              "w-full text-left px-3 py-2.5 flex items-start gap-2.5 hover:bg-accent transition-colors",
               isSelected && "bg-accent",
             )}
           >
@@ -182,10 +182,17 @@ function StepList({ spans, currentStep, onSelect }: StepListProps) {
 
             {/* Action + duration */}
             <div className="flex-1 min-w-0">
-              <span className="block text-xs font-mono text-foreground truncate">
+              <span
+                className={cn(
+                  "block text-xs font-mono truncate",
+                  isSelected
+                    ? "text-foreground font-semibold"
+                    : "text-foreground",
+                )}
+              >
                 {span.action}
               </span>
-              <span className="block text-[10px] text-muted-foreground mt-0.5">
+              <span className="block text-[10px] text-muted-foreground mt-0.5 tabular-nums">
                 {formatDurationMs(span.durationMs)}
               </span>
             </div>
@@ -254,22 +261,26 @@ function StatePanel({ span }: StatePanelProps) {
         <div className="space-y-4">
           {/* Timing */}
           <div>
-            <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1.5">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-2">
               Timing
             </p>
-            <div className="flex gap-3 text-xs">
-              <span className="text-muted-foreground">
-                Start:{" "}
-                <span className="font-mono text-foreground tabular-nums">
+            <div className="grid grid-cols-2 gap-px bg-background rounded-xl overflow-hidden">
+              <div className="bg-muted px-3 py-2">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Start
+                </p>
+                <p className="text-xs font-mono text-foreground tabular-nums">
                   {formatDurationMs(span.startMs)}
-                </span>
-              </span>
-              <span className="text-muted-foreground">
-                Duration:{" "}
-                <span className="font-mono text-foreground tabular-nums">
+                </p>
+              </div>
+              <div className="bg-muted px-3 py-2">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Duration
+                </p>
+                <p className="text-xs font-mono text-foreground tabular-nums">
                   {formatDurationMs(span.durationMs)}
-                </span>
-              </span>
+                </p>
+              </div>
             </div>
           </div>
 
@@ -359,7 +370,7 @@ function PlaybackControls({
   onScrub,
 }: PlaybackControlsProps) {
   return (
-    <div className="shrink-0 flex flex-col gap-2 bg-background px-4 py-2.5">
+    <div className="shrink-0 flex flex-col gap-2 bg-card px-4 py-3">
       {/* Controls row */}
       <div className="flex items-center gap-3">
         {/* Playback buttons */}
@@ -829,9 +840,8 @@ export default function EpisodeReplay() {
           </Badge>
         )}
 
-        <span className="ml-auto text-[10px] text-muted-foreground/50 font-mono hidden md:block">
-          Space: play/pause &nbsp;|&nbsp; &larr;&rarr; / j k: step &nbsp;|&nbsp;
-          Home/End: first/last
+        <span className="ml-auto text-[10px] text-muted-foreground font-mono hidden md:block">
+          Space: play/pause  |  ←→ / j k: step  |  Home/End: first/last
         </span>
       </div>
 
@@ -840,73 +850,89 @@ export default function EpisodeReplay() {
       {/* ------------------------------------------------------------------ */}
       {isCUA ? (
         /* ----------------------------------------------------------------
-           CUA Layout:
-           +-------------------------------------+------------------+
-           |  Full screenshot + action card       | ManualReview    |
-           |                                     | Sidebar         |
-           +-------------------------------------+------------------+
-           | [filmstrip thumbnails -- horizontal scroll]            |
-           +-------------------------------------------------------+
-           | PlaybackControls                                       |
-           +-------------------------------------------------------+
+           CUA Layout: screenshot (left) | action detail (right)
+           + filmstrip + playback controls at bottom
         ---------------------------------------------------------------- */
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          {/* Main area: screenshot viewer + optional review sidebar */}
+          {/* Main area */}
           <div className="flex-1 min-h-0 flex overflow-hidden">
-            {/* Screenshot viewer */}
-            <div className="flex-1 min-w-0 overflow-auto p-4 space-y-4">
+            {/* Left: screenshot */}
+            <div className="flex-1 min-w-0 overflow-auto bg-background p-4 flex items-start justify-center">
+              {currentSpan ? (
+                (() => {
+                  const rawPath = currentSpan.observation["screenshot_path"];
+                  const filename =
+                    typeof rawPath === "string"
+                      ? rawPath.split("/").pop()
+                      : null;
+                  const src = filename
+                    ? cuaScreenshotUrl(episodeId, filename)
+                    : null;
+                  return src ? (
+                    <img
+                      src={src}
+                      alt={`Step ${currentStep + 1} screenshot`}
+                      className="max-w-full max-h-full rounded-xl shadow-sm object-contain"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center w-full h-64 rounded-xl bg-muted text-xs text-muted-foreground">
+                      No screenshot for this step
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
+                  {spans.length === 0
+                    ? "No steps in this episode."
+                    : "Select a step"}
+                </div>
+              )}
+            </div>
+
+            {/* Right: action detail panel */}
+            <div className="w-80 shrink-0 flex flex-col overflow-hidden bg-card">
               {currentSpan ? (
                 <>
-                  {/* Full-size screenshot */}
-                  {(() => {
-                    const rawPath = currentSpan.observation["screenshot_path"];
-                    const filename =
-                      typeof rawPath === "string"
-                        ? rawPath.split("/").pop()
-                        : null;
-                    const src = filename
-                      ? cuaScreenshotUrl(episodeId, filename)
-                      : null;
-                    return src ? (
-                      <img
-                        src={src}
-                        alt={`Step ${currentStep + 1} screenshot`}
-                        className="max-w-full rounded-xl shadow-sm"
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-64 rounded-xl bg-muted text-xs text-muted-foreground">
-                        No screenshot for this step
-                      </div>
-                    );
-                  })()}
-
-                  {/* Action detail card */}
-                  <div className="rounded-2xl bg-muted p-4 space-y-3">
+                  {/* Step header */}
+                  <div className="shrink-0 bg-muted px-4 py-3 space-y-1.5">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-mono font-semibold text-foreground">
                         Step {currentStep + 1}
                       </span>
-                      <span className="text-[10px] font-mono text-muted-foreground">
+                      <span className="text-xs font-mono text-muted-foreground truncate">
                         {currentSpan.action}
                       </span>
-                      <span className="ml-auto text-[10px] text-muted-foreground">
-                        {formatDurationMs(currentSpan.durationMs)}
-                      </span>
                     </div>
-                    <div className="space-y-2">
-                      <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge
+                        variant="secondary"
+                        className="text-[10px] font-mono"
+                      >
+                        {formatDurationMs(currentSpan.durationMs)}
+                      </Badge>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {currentSpan.status}
+                      </Badge>
+                    </div>
+                  </div>
+                  {/* Scrollable details */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                         Input
                       </p>
-                      <pre className="text-xs font-mono bg-card text-foreground p-3 rounded-xl overflow-auto max-h-40 whitespace-pre-wrap wrap-break-word">
+                      <pre className="text-xs font-mono bg-muted text-foreground p-3 rounded-xl overflow-auto max-h-52 whitespace-pre-wrap wrap-break-word">
                         {JSON.stringify(currentSpan.params, null, 2)}
                       </pre>
                     </div>
-                    {Object.keys(currentSpan.observation).length > 1 && (
-                      <div className="space-y-2">
-                        <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                    {Object.keys(currentSpan.observation).filter(
+                      (k) => k !== "screenshot_path",
+                    ).length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                           Observation
                         </p>
-                        <pre className="text-xs font-mono bg-card text-foreground p-3 rounded-xl overflow-auto max-h-40 whitespace-pre-wrap wrap-break-word">
+                        <pre className="text-xs font-mono bg-muted text-foreground p-3 rounded-xl overflow-auto max-h-52 whitespace-pre-wrap wrap-break-word">
                           {JSON.stringify(
                             Object.fromEntries(
                               Object.entries(currentSpan.observation).filter(
@@ -923,9 +949,7 @@ export default function EpisodeReplay() {
                 </>
               ) : (
                 <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
-                  {spans.length === 0
-                    ? "No steps in this episode."
-                    : "Select a step"}
+                  No step selected
                 </div>
               )}
             </div>
@@ -963,7 +987,7 @@ export default function EpisodeReplay() {
         <div className="flex-1 min-h-0">
           <ResizablePanelGroup orientation="horizontal" className="h-full">
             {/* Left panel: step list */}
-            <ResizablePanel defaultSize={25} minSize={15}>
+            <ResizablePanel defaultSize={28} minSize={18}>
               <StepList
                 spans={spans}
                 currentStep={currentStep}
@@ -974,7 +998,7 @@ export default function EpisodeReplay() {
             <ResizableHandle withHandle />
 
             {/* Right panel: playback controls + state panel */}
-            <ResizablePanel defaultSize={75} minSize={40}>
+            <ResizablePanel defaultSize={72} minSize={40}>
               <div className="flex flex-col h-full overflow-hidden">
                 {/* Playback controls */}
                 <PlaybackControls {...playbackControlsProps} />

@@ -1,4 +1,4 @@
-import { formatTimestamp } from '@/lib/trace-utils'
+import { formatTimestamp } from "@/lib/trace-utils";
 
 // ---------------------------------------------------------------------------
 // TraceTimelineHeader – sticky time axis with evenly spaced tick marks
@@ -6,11 +6,11 @@ import { formatTimestamp } from '@/lib/trace-utils'
 
 interface TraceTimelineHeaderProps {
   /** Total duration of the episode in milliseconds */
-  totalMs: number
+  totalMs: number;
   /** Current zoom factor (1 = 100%) */
-  zoom: number
+  zoom: number;
   /** Horizontal scroll offset in pixels (for tick alignment awareness) */
-  offsetPx?: number
+  offsetPx?: number;
 }
 
 /**
@@ -22,44 +22,46 @@ export function TraceTimelineHeader({
   zoom,
 }: TraceTimelineHeaderProps) {
   // Target 8-12 ticks across the visible span
-  const tickCount = 10
+  const tickCount = 10;
 
   // Ticks are evenly spaced across the full time range
-  const ticks: number[] = []
+  const ticks: number[] = [];
   for (let i = 0; i <= tickCount; i++) {
-    ticks.push((totalMs / tickCount) * i)
+    ticks.push((totalMs / tickCount) * i);
   }
 
   return (
     <div
-      className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-900/95 backdrop-blur-sm"
+      className="sticky top-0 z-10 bg-card"
       style={{
-        height: 28,
-        // The header width matches the zoomed content width
+        height: 32,
         width: `${zoom * 100}%`,
-        minWidth: '100%',
-        position: 'relative',
+        minWidth: "100%",
+        position: "relative",
       }}
     >
       <div className="relative h-full w-full">
         {ticks.map((ms, i) => {
-          const leftPct = (ms / totalMs) * 100
+          const leftPct = (ms / totalMs) * 100;
           return (
             <div
               key={i}
               className="absolute top-0 flex flex-col items-center"
-              style={{ left: `${leftPct}%`, transform: 'translateX(-50%)' }}
+              style={{ left: `${leftPct}%`, transform: "translateX(-50%)" }}
             >
               {/* Tick mark */}
-              <div className="w-px bg-zinc-700" style={{ height: 6, marginTop: 0 }} />
+              <div
+                className="w-px bg-muted-foreground"
+                style={{ height: 5, marginTop: 2 }}
+              />
               {/* Label */}
-              <span className="text-[10px] leading-none text-zinc-500 whitespace-nowrap px-0.5">
+              <span className="text-[10px] leading-none text-muted-foreground whitespace-nowrap px-0.5 mt-0.5">
                 {formatTimestamp(ms)}
               </span>
             </div>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }

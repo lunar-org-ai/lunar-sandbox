@@ -293,7 +293,7 @@ class CUALaunchRequest(BaseModel):
     agent_mode: str = "manual"  # "manual" (keep alive for user) or "model" (AI-driven)
     start_url: str | None = None
     resolution: str = "1280x800"
-    max_steps: int = 100
+    max_steps: int = 1000
     time_limit: float = 300.0
     # Script reward fields
     script_content: str | None = None

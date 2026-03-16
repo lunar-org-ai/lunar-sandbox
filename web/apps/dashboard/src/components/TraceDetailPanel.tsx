@@ -1,4 +1,5 @@
 import {
+  Clock,
   FileText,
   FilePen,
   FolderOpen,
@@ -15,7 +16,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DiffViewer, type FileDiffEntry } from "@/components/DiffViewer";
-import { formatDurationMs, type TraceSpan } from "@/lib/trace-utils";
+import {
+  formatDurationMs,
+  getActionColor,
+  type TraceSpan,
+} from "@/lib/trace-utils";
 import { cn } from "@/lib/utils";
 
 export interface TraceDetailPanelProps {
@@ -87,7 +92,7 @@ function ValueView({ value }: { value: unknown }) {
     return <span className="text-foreground font-mono">{String(value)}</span>;
   }
   return (
-    <pre className="text-xs font-mono bg-muted text-muted-foreground p-2 rounded overflow-auto max-h-40 border">
+    <pre className="text-xs font-mono bg-card text-muted-foreground p-2 rounded-lg overflow-auto max-h-40">
       {JSON.stringify(value, null, 2)}
     </pre>
   );
@@ -155,17 +160,13 @@ export function TraceDetailPanel({
 
   const ActionIcon = getActionIcon(span.action);
   const badge = statusVariant(span.status);
+  const color = getActionColor(span.action);
 
   const startTime = formatAbsoluteTime(episodeStartTs, span.startMs);
   const endTime = formatAbsoluteTime(
     episodeStartTs,
     span.startMs + span.durationMs,
   );
-
-  const parentPct =
-    parentDurationMs && parentDurationMs > 0
-      ? `${((span.durationMs / parentDurationMs) * 100).toFixed(1)}%`
-      : "--";
 
   const stdout =
     typeof span.observation["stdout"] === "string"
@@ -200,209 +201,167 @@ export function TraceDetailPanel({
     token_count_out !== undefined ||
     model !== undefined;
 
-  // Per-token rates: only when model and both token counts and cost are available
-  const rateIn =
-    cost_usd !== undefined && token_count_in !== undefined && token_count_in > 0
-      ? (cost_usd / token_count_in) * 1000
-      : undefined;
-  const rateOut =
-    cost_usd !== undefined &&
-    token_count_out !== undefined &&
-    token_count_out > 0
-      ? (cost_usd / token_count_out) * 1000
-      : undefined;
-  const showRates =
-    model !== undefined && rateIn !== undefined && rateOut !== undefined;
-
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-background border-l">
-      <div className={cn("shrink-0 border-b p-4", isError && "bg-secondary")}>
-        <div className="flex items-center gap-2">
-          <ActionIcon
+    <div className="flex h-full flex-col overflow-hidden bg-card">
+      {/* ── Header ── */}
+      <div
+        className={cn(
+          "shrink-0 px-4 pt-4 pb-3",
+          isError ? "bg-destructive/10" : "bg-muted",
+        )}
+      >
+        {/* Top row: icon + action name + close */}
+        <div className="flex items-start gap-3">
+          <div
             className={cn(
-              "size-4 shrink-0",
-              isError ? "text-destructive" : "text-muted-foreground",
+              "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg",
+              color.bg,
             )}
-          />
-          <span className="font-semibold text-sm truncate flex-1">
-            {span.action}
-          </span>
+          >
+            <ActionIcon className="size-4 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm leading-tight truncate text-foreground">
+              {span.action}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5 font-mono">
+              Step {span.stepIdx + 1}
+            </p>
+          </div>
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="ml-auto h-6 w-6 p-0 shrink-0"
+            className="h-7 w-7 p-0 shrink-0"
             onClick={onClose}
             aria-label="Close detail panel"
           >
-            <X className="size-4" />
+            <X className="size-3.5" />
           </Button>
         </div>
-        <div className="mt-2 flex items-center gap-2 flex-wrap">
-          <Badge variant="secondary" className="font-mono">
+
+        {/* Chips row */}
+        <div className="mt-3 flex items-center gap-2 flex-wrap">
+          <Badge variant={badge.variant} className="text-xs">
+            {badge.label}
+          </Badge>
+          <Badge variant="secondary" className="font-mono text-xs">
+            <Clock className="size-3 mr-1" />
             {formatDurationMs(span.durationMs)}
           </Badge>
-          <Badge variant={badge.variant}>{badge.label}</Badge>
-          <span className="ml-auto text-xs text-muted-foreground font-mono">
-            Step {span.stepIdx + 1}
-          </span>
+          {parentDurationMs && parentDurationMs > 0 && (
+            <Badge variant="secondary" className="font-mono text-xs">
+              {((span.durationMs / parentDurationMs) * 100).toFixed(1)}% of run
+            </Badge>
+          )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        <div>
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-            Timing
-          </h3>
-          <div className="grid grid-cols-2 gap-2">
-            <TimingTile label="Start" value={startTime} />
-            <TimingTile label="End" value={endTime} />
-            <TimingTile
-              label="Duration"
-              value={formatDurationMs(span.durationMs)}
+      {/* ── Timing row ── */}
+      <div className="shrink-0 grid grid-cols-2 gap-px bg-background">
+        <MetricCell label="Start" value={startTime} mono />
+        <MetricCell label="End" value={endTime} mono />
+      </div>
+
+      {/* ── Cost & tokens (conditional) ── */}
+      {hasCostTokenData && (
+        <div className="shrink-0 grid grid-cols-2 gap-px bg-background">
+          {model && <MetricCell label="Model" value={model} />}
+          {cost_usd !== undefined && (
+            <MetricCell label="Cost" value={`$${cost_usd.toFixed(4)}`} mono />
+          )}
+          {token_count_in !== undefined && (
+            <MetricCell
+              label="In tokens"
+              value={token_count_in.toLocaleString()}
+              mono
             />
-            <TimingTile label="% of Total" value={parentPct} />
-          </div>
+          )}
+          {token_count_out !== undefined && (
+            <MetricCell
+              label="Out tokens"
+              value={token_count_out.toLocaleString()}
+              mono
+            />
+          )}
         </div>
+      )}
 
-        {hasCostTokenData && (
-          <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-              Cost &amp; Tokens
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              <TimingTile label="Model" value={model ?? "--"} />
-              <TimingTile
-                label="Cost"
-                value={
-                  cost_usd !== undefined ? `$${cost_usd.toFixed(4)}` : "--"
-                }
-              />
-              <TimingTile
-                label="Input Tokens"
-                value={
-                  token_count_in !== undefined
-                    ? token_count_in.toLocaleString()
-                    : "--"
-                }
-              />
-              <TimingTile
-                label="Output Tokens"
-                value={
-                  token_count_out !== undefined
-                    ? token_count_out.toLocaleString()
-                    : "--"
-                }
-              />
-            </div>
-            {showRates && (
-              <p className="text-xs text-muted-foreground mt-1.5">
-                Input: ${rateIn!.toFixed(2)}/1K tokens&nbsp;|&nbsp;Output: $
-                {rateOut!.toFixed(2)}/1K tokens
-              </p>
-            )}
-          </div>
-        )}
-
-        <Tabs defaultValue={isError ? "terminal" : "io"}>
-          <TabsList className="w-full">
-            <TabsTrigger value="io" className="flex-1 text-xs">
+      {/* ── Tabs: I/O / Diffs / Terminal ── */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <Tabs
+          defaultValue={isError ? "terminal" : "io"}
+          className="flex flex-col h-full"
+        >
+          <TabsList className="shrink-0 w-full rounded-none bg-muted justify-start gap-0 px-3 py-0 h-9">
+            <TabsTrigger
+              value="io"
+              className="rounded-none h-full px-3 text-xs data-[state=active]:bg-card data-[state=active]:shadow-none"
+            >
               I/O
             </TabsTrigger>
-            <TabsTrigger value="diffs" className="flex-1 text-xs">
+            <TabsTrigger
+              value="diffs"
+              className="rounded-none h-full px-3 text-xs data-[state=active]:bg-card data-[state=active]:shadow-none"
+            >
               {diffCount > 0 ? `Diffs (${diffCount})` : "Diffs"}
             </TabsTrigger>
-            <TabsTrigger value="terminal" className="flex-1 text-xs">
+            <TabsTrigger
+              value="terminal"
+              className="rounded-none h-full px-3 text-xs data-[state=active]:bg-card data-[state=active]:shadow-none"
+            >
               Terminal
             </TabsTrigger>
           </TabsList>
 
-          {/* I/O tab — Formatted / Raw sub-tabs */}
-          <TabsContent value="io">
-            <Tabs defaultValue="formatted">
-              <TabsList className="w-full mt-2">
-                <TabsTrigger value="formatted" className="flex-1 text-xs">
-                  Formatted
-                </TabsTrigger>
-                <TabsTrigger value="raw" className="flex-1 text-xs">
-                  Raw
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="formatted">
-                <div className="mt-2 space-y-3 max-h-64 overflow-auto rounded border p-3 bg-muted">
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground mb-1">
-                      Input
-                    </p>
-                    <KVList data={span.params} />
-                  </div>
-                  <div className="border-t pt-3">
-                    <p className="text-xs font-semibold text-muted-foreground mb-1">
-                      Output
-                    </p>
-                    <KVList data={span.observation} />
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="raw">
-                <pre className="mt-2 text-xs font-mono bg-muted text-muted-foreground p-3 rounded border max-h-64 overflow-auto">
-                  {JSON.stringify(
-                    { params: span.params, observation: span.observation },
-                    null,
-                    2,
-                  )}
-                </pre>
-              </TabsContent>
-            </Tabs>
+          {/* I/O tab */}
+          <TabsContent
+            value="io"
+            className="flex-1 overflow-y-auto m-0 p-4 space-y-4"
+          >
+            <Section label="Input">
+              {Object.keys(span.params).length === 0 ? (
+                <Empty />
+              ) : (
+                <KVList data={span.params} />
+              )}
+            </Section>
+            <Section label="Output">
+              {Object.keys(span.observation).length === 0 ? (
+                <Empty />
+              ) : (
+                <KVList data={span.observation} />
+              )}
+            </Section>
           </TabsContent>
 
-          <TabsContent value="diffs">
-            <div
-              className="mt-2 rounded border overflow-hidden"
-              style={{ minHeight: 200 }}
-            >
-              <DiffViewer files={fileDiffs} />
-            </div>
+          {/* Diffs tab */}
+          <TabsContent value="diffs" className="flex-1 overflow-hidden m-0">
+            {diffCount === 0 ? (
+              <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
+                No file changes
+              </div>
+            ) : (
+              <div className="h-full">
+                <DiffViewer files={fileDiffs} />
+              </div>
+            )}
           </TabsContent>
 
           {/* Terminal tab */}
-          <TabsContent value="terminal">
-            <div className="mt-2">
-              {isError ? (
-                <div className="rounded border-l-4 border-destructive bg-secondary p-3 border">
-                  <h3 className="text-xs font-semibold text-destructive uppercase tracking-wide mb-2">
-                    Terminal Output
-                  </h3>
-                  {hasTerminalOutput ? (
-                    <TerminalOutputBlocks
-                      stdout={stdout}
-                      stderr={stderr}
-                      prominent
-                    />
-                  ) : (
-                    <p className="text-xs text-muted-foreground italic">
-                      No terminal output
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="rounded border bg-muted p-3">
-                  {hasTerminalOutput ? (
-                    <TerminalOutputBlocks
-                      stdout={stdout}
-                      stderr={stderr}
-                      prominent={false}
-                    />
-                  ) : (
-                    <p className="text-xs text-muted-foreground italic">
-                      No terminal output
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
+          <TabsContent
+            value="terminal"
+            className="flex-1 overflow-y-auto m-0 p-4 space-y-4"
+          >
+            {hasTerminalOutput ? (
+              <TerminalOutputBlocks
+                stdout={stdout}
+                stderr={stderr}
+                prominent={isError}
+              />
+            ) : (
+              <Empty label="No terminal output" />
+            )}
           </TabsContent>
         </Tabs>
       </div>
@@ -410,20 +369,46 @@ export function TraceDetailPanel({
   );
 }
 
-interface TimingTileProps {
+interface MetricCellProps {
   label: string;
   value: string;
+  mono?: boolean;
 }
 
-function TimingTile({ label, value }: TimingTileProps) {
+function MetricCell({ label, value, mono }: MetricCellProps) {
   return (
-    <div className="rounded bg-muted px-2 py-1.5">
-      <p className="text-xs uppercase tracking-wide text-muted-foreground mb-0.5">
+    <div className="bg-muted px-4 py-2.5">
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-0.5">
         {label}
       </p>
-      <p className="text-xs font-mono truncate">{value}</p>
+      <p
+        className={cn("text-xs text-foreground truncate", mono && "font-mono")}
+      >
+        {value}
+      </p>
     </div>
   );
+}
+
+function Section({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
+        {label}
+      </p>
+      <div className="rounded-xl bg-muted p-3">{children}</div>
+    </div>
+  );
+}
+
+function Empty({ label = "empty" }: { label?: string }) {
+  return <span className="text-xs text-muted-foreground italic">{label}</span>;
 }
 
 interface TerminalOutputBlocksProps {
@@ -438,16 +423,16 @@ function TerminalOutputBlocks({
   prominent,
 }: TerminalOutputBlocksProps) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {stdout !== null && (
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1.5 font-medium">
             stdout
           </p>
           <pre
             className={cn(
-              "text-xs font-mono rounded p-2 overflow-auto whitespace-pre-wrap wrap-break-word bg-muted",
-              prominent ? "max-h-48" : "max-h-32",
+              "text-xs font-mono rounded-xl p-3 overflow-auto whitespace-pre-wrap wrap-break-word bg-muted",
+              prominent ? "max-h-60" : "max-h-40",
             )}
           >
             {stdout}
@@ -456,13 +441,13 @@ function TerminalOutputBlocks({
       )}
       {stderr !== null && (
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1.5 font-medium">
             stderr
           </p>
           <pre
             className={cn(
-              "text-xs font-mono rounded p-2 overflow-auto whitespace-pre-wrap wrap-break-word bg-muted text-destructive",
-              prominent ? "max-h-48" : "max-h-32",
+              "text-xs font-mono rounded-xl p-3 overflow-auto whitespace-pre-wrap wrap-break-word bg-muted text-destructive",
+              prominent ? "max-h-60" : "max-h-40",
             )}
           >
             {stderr}

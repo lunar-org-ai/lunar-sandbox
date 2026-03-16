@@ -344,14 +344,14 @@ export default function CUALauncher() {
                 </label>
                 <Input
                   type="number"
-                  placeholder="100"
+                  placeholder="1000"
                   value={maxSteps}
                   onChange={(e) => setMaxSteps(e.target.value)}
                   min={1}
                 />
                 <p className="text-xs text-muted-foreground">
                   Maximum number of agent actions. Leave blank for default
-                  (100).
+                  (1000).
                 </p>
               </div>
 
