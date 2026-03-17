@@ -188,6 +188,7 @@ export interface CUALaunchParams {
   instruction: string
   reward_type?: string
   agent_mode?: 'manual' | 'model'
+  api_key?: string
   start_url?: string
   resolution?: string
   max_steps?: number

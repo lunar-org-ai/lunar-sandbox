@@ -59,6 +59,9 @@ export default function CUALauncher() {
   const [agentMode, setAgentMode] = useState<AgentMode>("manual");
   const [rewardType, setRewardType] = useState<RewardType>("manual");
 
+  // API key (for model mode)
+  const [apiKey, setApiKey] = useState("");
+
   // Script reward
   const [scriptContent, setScriptContent] = useState("");
 
@@ -101,6 +104,7 @@ export default function CUALauncher() {
         instruction: instruction.trim(),
         agent_mode: agentMode,
         reward_type: rewardType,
+        api_key: agentMode === "model" && apiKey.trim() ? apiKey.trim() : undefined,
         script_content:
           rewardType === "script" ? scriptContent || undefined : undefined,
         reference_image_url:
@@ -196,10 +200,28 @@ export default function CUALauncher() {
             </Select>
             <p className="text-xs text-muted-foreground">
               {agentMode === "model"
-                ? "Claude will see the screen and interact autonomously. Requires ANTHROPIC_API_KEY on the server."
+                ? "Claude will see the screen and interact autonomously."
                 : "Sandbox stays alive for you to observe or interact via the live view."}
             </p>
           </div>
+
+          {/* API Key (model mode only) */}
+          {agentMode === "model" && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                Anthropic API Key
+              </label>
+              <Input
+                type="password"
+                placeholder="sk-ant-..."
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Falls back to the server&apos;s ANTHROPIC_API_KEY environment variable if left blank.
+              </p>
+            </div>
+          )}
 
           {/* Reward type */}
           <div className="space-y-2">

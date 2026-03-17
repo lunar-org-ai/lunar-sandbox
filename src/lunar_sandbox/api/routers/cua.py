@@ -206,6 +206,7 @@ async def launch_cua_episode(
             agent = ModelAgent(
                 instruction=req.instruction,
                 screen_size=(width, height),
+                api_key=req.api_key or None,
             )
         except ValueError as exc:
             raise HTTPException(

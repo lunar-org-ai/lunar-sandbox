@@ -291,6 +291,7 @@ class CUALaunchRequest(BaseModel):
     instruction: str
     reward_type: str = "manual"  # "manual", "script", "screenshot_match"
     agent_mode: str = "manual"  # "manual" (keep alive for user) or "model" (AI-driven)
+    api_key: str | None = None  # Anthropic API key (falls back to ANTHROPIC_API_KEY env var)
     start_url: str | None = None
     resolution: str = "1280x800"
     max_steps: int = 1000

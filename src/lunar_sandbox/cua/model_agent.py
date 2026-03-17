@@ -57,6 +57,7 @@ class ModelAgent:
                 "variable or pass api_key to ModelAgent."
             )
         self._messages: list[dict[str, Any]] = []
+        self._pending_tool_use_id: str | None = None
         self._client = httpx.AsyncClient(timeout=60.0)
 
     async def __call__(self, obs: CUAObservation) -> dict[str, Any]:
@@ -68,41 +69,67 @@ class ModelAgent:
         Returns:
             Action dict compatible with CUAActionHandler.execute_action().
         """
-        # Build the user message with the screenshot
+        # Build the user message content
         content: list[dict[str, Any]] = []
 
-        if obs.screenshot_b64:
-            content.append({
-                "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": "image/jpeg",
-                    "data": obs.screenshot_b64,
-                },
-            })
+        # If the previous response had a tool_use, we must send a tool_result
+        if self._pending_tool_use_id:
+            tool_result_content: list[dict[str, Any]] = []
+            if obs.screenshot_b64:
+                tool_result_content.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/jpeg",
+                        "data": obs.screenshot_b64,
+                    },
+                })
+            if obs.error_message:
+                tool_result_content.append({
+                    "type": "text",
+                    "text": f"Error: {obs.error_message}",
+                })
+            if not tool_result_content:
+                tool_result_content.append({"type": "text", "text": "Action executed."})
 
-        if obs.error_message:
             content.append({
-                "type": "text",
-                "text": f"Error from previous action: {obs.error_message}",
+                "type": "tool_result",
+                "tool_use_id": self._pending_tool_use_id,
+                "content": tool_result_content,
             })
-
-        if not content:
-            content.append({"type": "text", "text": "What should I do next?"})
+            self._pending_tool_use_id = None
+        else:
+            # First message or after a non-tool response
+            if obs.screenshot_b64:
+                content.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/jpeg",
+                        "data": obs.screenshot_b64,
+                    },
+                })
+            if obs.error_message:
+                content.append({
+                    "type": "text",
+                    "text": f"Error from previous action: {obs.error_message}",
+                })
+            if not content:
+                content.append({"type": "text", "text": "What should I do next?"})
 
         self._messages.append({"role": "user", "content": content})
 
         # Call Claude API
         response = await self._call_api()
 
-        # Parse the response
-        action = self._parse_response(response)
-
         # Add assistant response to conversation history
         self._messages.append({
             "role": "assistant",
             "content": response.get("content", []),
         })
+
+        # Parse the response and track tool_use IDs for the next turn
+        action = self._parse_response(response)
 
         log.debug("model_agent_action", action=action.get("action"))
         return action
@@ -135,7 +162,7 @@ class ModelAgent:
 
         headers = {
             "x-api-key": self._api_key,
-            "anthropic-version": "2025-01-24",
+            "anthropic-version": "2023-06-01",
             "content-type": "application/json",
             "anthropic-beta": "computer-use-2025-01-24",
         }
@@ -162,6 +189,7 @@ class ModelAgent:
         """
         for block in response.get("content", []):
             if block.get("type") == "tool_use" and block.get("name") == "computer":
+                self._pending_tool_use_id = block.get("id")
                 inp = block.get("input", {})
                 action_type = inp.get("action", "")
 
