@@ -149,7 +149,13 @@ async function _checkWebCodecsH264DecodeSupport() {
 
     return true;
 }
-supportsWebCodecsH264Decode = await _checkWebCodecsH264DecodeSupport();
+// NOTE: top-level await here caused "Cannot access 'default' before
+// initialization" in Safari when rfb.js was dynamically imported.
+// Fire-and-forget the async check instead; the variable is updated in-place
+// once the check completes.
+_checkWebCodecsH264DecodeSupport().then((supported) => {
+    supportsWebCodecsH264Decode = supported;
+}).catch(() => {});
 
 /*
  * The functions for detection of platforms and browsers below are exported

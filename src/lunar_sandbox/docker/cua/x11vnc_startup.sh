@@ -9,7 +9,7 @@ x11vnc \
     -rfbport "${VNC_PORT}" \
     -nopw \
     -xkb \
-    -ncache 10 \
+    -noxdamage \
     -bg
 
 # Verify the process started
