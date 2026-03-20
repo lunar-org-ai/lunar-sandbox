@@ -136,12 +136,14 @@ class CUAEpisodeRunner:
         agent: Callable,
         episode_id: str | None = None,
         trajectory_dir: Path | None = None,
+        event_hub: Any | None = None,
     ) -> None:
         self._task = task
         self._sandbox = sandbox
         self._agent = agent
         self._episode_id = episode_id or f"cua-ep-{uuid4().hex[:8]}"
         self._trajectory_dir = trajectory_dir
+        self._event_hub = event_hub
         self._handler = CUAActionHandler(sandbox, sandbox._cua_config)
         self._agent_is_async = asyncio.iscoroutinefunction(agent) or asyncio.iscoroutinefunction(getattr(agent, '__call__', None))
         self._log = log.bind(episode_id=self._episode_id)
@@ -181,7 +183,13 @@ class CUAEpisodeRunner:
             )
             await asyncio.sleep(2)  # Give Chromium time to load
 
-        # -- 4. Main action loop -------------------------------------------
+        # -- 4. Publish episode start event ---------------------------------
+        self._publish("cua_episode_start", {
+            "episode_id": self._episode_id,
+            "instruction": self._task.instruction,
+        })
+
+        # -- 5. Main action loop -------------------------------------------
         start_time = time.monotonic()
         start_ts = time.time()
         deadline = start_time + self._task.time_limit
@@ -237,7 +245,17 @@ class CUAEpisodeRunner:
                 else:
                     action_dict = await asyncio.to_thread(self._agent, observation)
 
-                # e. Validate action dict
+                # e. Publish agent reasoning + action via WebSocket
+                reasoning = getattr(self._agent, "last_reasoning", None)
+                self._publish("cua_step", {
+                    "episode_id": self._episode_id,
+                    "step": step_idx,
+                    "action": action_dict.get("action", "unknown") if isinstance(action_dict, dict) else "unknown",
+                    "action_params": {k: v for k, v in action_dict.items() if k != "action"} if isinstance(action_dict, dict) else {},
+                    "reasoning": reasoning,
+                })
+
+                # f. Validate action dict
                 if not isinstance(action_dict, dict) or "action" not in action_dict:
                     raise ValueError(
                         f"Agent must return a dict with 'action' key, "
@@ -332,6 +350,14 @@ class CUAEpisodeRunner:
                     score=score,
                 )
 
+        self._publish("cua_episode_end", {
+            "episode_id": self._episode_id,
+            "outcome": outcome,
+            "step_count": step_idx,
+            "duration_ms": round(duration_ms, 1),
+            "error": error_message,
+        })
+
         self._log.info(
             "cua_episode_complete",
             outcome=outcome,
@@ -365,6 +391,12 @@ class CUAEpisodeRunner:
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
+
+    def _publish(self, event_type: str, payload: dict[str, Any]) -> None:
+        """Publish a real-time event if an EventHub is configured."""
+        if self._event_hub is not None:
+            topic = f"cua:{self._episode_id}"
+            self._event_hub.publish_event(event_type, topic, payload)
 
     def _write_step(
         self,

@@ -59,6 +59,7 @@ class ModelAgent:
         self._messages: list[dict[str, Any]] = []
         self._pending_tool_use_id: str | None = None
         self._client = httpx.AsyncClient(timeout=60.0)
+        self.last_reasoning: str | None = None  # Text reasoning from the last response
 
     async def __call__(self, obs: CUAObservation) -> dict[str, Any]:
         """Process an observation and return the next action.
@@ -144,7 +145,13 @@ class ModelAgent:
             "system": (
                 f"You are a computer-use agent. Your task: {self._instruction}\n\n"
                 f"The screen resolution is {w}x{h}. "
+                "You are controlling a Linux desktop with Openbox window manager. "
+                "To open applications, RIGHT-CLICK on the desktop to get the Openbox menu, "
+                "then navigate the menu to find and launch applications. "
+                "Available apps include: Chromium (web browser), LXTerminal, "
+                "Mousepad (text editor), PCManFM (file manager), and Galculator (calculator). "
                 "Use the computer tool to interact with the desktop. "
+                "Be precise with coordinates when clicking. "
                 "When the task is complete, respond with a text message "
                 "containing the word DONE (do not use the computer tool)."
             ),
@@ -187,6 +194,13 @@ class ModelAgent:
         Looks for a computer-use tool_use block. If Claude responds with
         only text (no tool call), treats it as a stop signal.
         """
+        # Capture any text reasoning from the response
+        reasoning_parts = []
+        for block in response.get("content", []):
+            if block.get("type") == "text" and block.get("text"):
+                reasoning_parts.append(block["text"])
+        self.last_reasoning = "\n".join(reasoning_parts) if reasoning_parts else None
+
         for block in response.get("content", []):
             if block.get("type") == "tool_use" and block.get("name") == "computer":
                 self._pending_tool_use_id = block.get("id")

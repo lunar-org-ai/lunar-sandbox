@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     lxterminal \
     mousepad \
     pcmanfm \
+    galculator \
     # Taskbar panel (Windows-like bottom bar)
     tint2 \
     # Background setting utility
