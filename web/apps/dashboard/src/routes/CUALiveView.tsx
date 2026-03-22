@@ -13,6 +13,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { NoVNCViewer } from "@/components/NoVNCViewer";
+import { CUAActivityPanel } from "@/components/CUAActivityPanel";
+import { useCUAStream } from "@/hooks/useCUAStream";
 import { fetchCUAEpisodeDetail, type CUAEpisodeInfo } from "@/lib/api";
 
 // ---------------------------------------------------------------------------
@@ -48,6 +50,8 @@ export default function CUALiveView() {
   // Toolbar state
   const [viewOnly, setViewOnly] = useState(true);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  // CUA activity stream
+  const { events: cuaEvents, isLive } = useCUAStream(episodeId || null);
 
   // Refs for timers
   const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -121,7 +125,6 @@ export default function CUALiveView() {
   // Screenshot capture (opens screenshot in new tab)
   // ---------------------------------------------------------------------------
   function handleScreenshot() {
-    // Screenshot API not yet wired -- placeholder
     window.open(
       `/api/cua/episodes/${encodeURIComponent(episodeId)}/screenshot`,
       "_blank",
@@ -141,7 +144,7 @@ export default function CUALiveView() {
   return (
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
       {/* Toolbar */}
-      <div className="shrink-0 flex items-center gap-3 px-4 h-12 bg-background">
+      <div className="shrink-0 flex items-center gap-3 px-4 h-12 border-b border-border">
         {/* Back */}
         <Link
           to="/runs"
@@ -225,32 +228,44 @@ export default function CUALiveView() {
         >
           <Maximize2 className="size-4" />
         </Button>
+
       </div>
 
-      {/* Desktop viewer */}
-      <div ref={viewerContainerRef} className="flex-1 relative overflow-hidden">
-        {episodeId && wsUrl && (
-          <NoVNCViewer
-            wsUrl={wsUrl}
-            viewOnly={viewOnly}
-            onConnect={() => setConnected(true)}
-            onDisconnect={() => setConnected(false)}
-            className="w-full h-full"
-          />
-        )}
+      {/* Main content: VNC + Activity Panel */}
+      <div ref={viewerContainerRef} className="flex-1 min-h-0 relative overflow-hidden">
+        <div className="flex h-full">
+          {/* Desktop viewer panel */}
+          <div className="flex-1 min-w-0 relative">
+            {episodeId && wsUrl && (
+              <NoVNCViewer
+                wsUrl={wsUrl}
+                viewOnly={viewOnly}
+                onConnect={() => setConnected(true)}
+                onDisconnect={() => setConnected(false)}
+                className="w-full h-full"
+              />
+            )}
 
-        {/* No VNC URL available */}
-        {episodeId && !wsUrl && (
-          <div className="flex h-full items-center justify-center">
-            <div className="text-center space-y-2">
-              <p className="text-sm font-medium">No VNC session available</p>
-              <p className="text-xs text-muted-foreground">
-                The desktop session URL was not provided. Try launching a new
-                episode.
-              </p>
-            </div>
+            {episodeId && !wsUrl && (
+              <div className="flex h-full items-center justify-center">
+                <div className="text-center space-y-2">
+                  <p className="text-sm font-medium">
+                    No VNC session available
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    The desktop session URL was not provided. Try launching
+                    a new episode.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Activity panel — always visible */}
+          <div className="w-80 shrink-0 border-l border-border">
+            <CUAActivityPanel events={cuaEvents} isLive={isLive} />
+          </div>
+        </div>
 
         {/* Episode complete overlay */}
         {complete && (

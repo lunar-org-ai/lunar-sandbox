@@ -167,6 +167,57 @@ def _tools_anthropic() -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# Model pricing (USD per token)
+# ---------------------------------------------------------------------------
+
+# Pricing per 1 token: (input_cost, output_cost)
+# Source: provider pricing pages as of 2025-05.
+_MODEL_PRICING: dict[str, tuple[float, float]] = {
+    # OpenAI
+    "gpt-4o": (2.5e-6, 10e-6),
+    "gpt-4o-mini": (0.15e-6, 0.6e-6),
+    "gpt-4o-2024-11-20": (2.5e-6, 10e-6),
+    "gpt-4-turbo": (10e-6, 30e-6),
+    "gpt-4": (30e-6, 60e-6),
+    "gpt-3.5-turbo": (0.5e-6, 1.5e-6),
+    "o1": (15e-6, 60e-6),
+    "o1-mini": (3e-6, 12e-6),
+    "o3": (10e-6, 40e-6),
+    "o3-mini": (1.1e-6, 4.4e-6),
+    "o4-mini": (1.1e-6, 4.4e-6),
+    # Anthropic
+    "claude-opus-4-20250514": (15e-6, 75e-6),
+    "claude-sonnet-4-20250514": (3e-6, 15e-6),
+    "claude-3-5-sonnet-20241022": (3e-6, 15e-6),
+    "claude-3-5-haiku-20241022": (0.8e-6, 4e-6),
+    "claude-3-opus-20240229": (15e-6, 75e-6),
+    "claude-3-haiku-20240307": (0.25e-6, 1.25e-6),
+}
+
+
+def _estimate_cost(
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+) -> float | None:
+    """Estimate cost in USD from token counts and model name.
+
+    Returns None if the model is not in the pricing table.
+    """
+    pricing = _MODEL_PRICING.get(model)
+    if pricing is None:
+        # Try prefix match for versioned model names (e.g. gpt-4o-2024-08-06)
+        for key, val in _MODEL_PRICING.items():
+            if model.startswith(key):
+                pricing = val
+                break
+    if pricing is None:
+        return None
+    input_cost, output_cost = pricing
+    return round(input_tokens * input_cost + output_tokens * output_cost, 6)
+
+
+# ---------------------------------------------------------------------------
 # Provider adapters
 # ---------------------------------------------------------------------------
 
@@ -235,14 +286,21 @@ def openai_adapter(
             })
 
         usage = None
+        cost_usd = None
         if response.usage:
             usage = {"total_tokens": response.usage.total_tokens}
+            cost_usd = _estimate_cost(
+                model,
+                response.usage.prompt_tokens,
+                response.usage.completion_tokens,
+            )
 
         return {
             "content": msg.content or "",
             "tool_calls": tool_calls,
             "stop": choice.finish_reason == "stop",
             "usage": usage,
+            "cost_usd": cost_usd,
         }
 
     return call_llm
@@ -309,16 +367,23 @@ def anthropic_adapter(
                 })
 
         usage = None
+        cost_usd = None
         if response.usage:
             usage = {
                 "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
             }
+            cost_usd = _estimate_cost(
+                model,
+                response.usage.input_tokens,
+                response.usage.output_tokens,
+            )
 
         return {
             "content": content_text,
             "tool_calls": tool_calls,
             "stop": response.stop_reason == "end_turn",
             "usage": usage,
+            "cost_usd": cost_usd,
         }
 
     return call_llm
@@ -383,7 +448,13 @@ class Session:
         )
 
         # --- Open trajectory store ---
+        # Resolve relative db_path against the project root (where pyproject.toml
+        # lives) so that notebooks/scripts in subdirectories share the same DB
+        # as the API server.
         db = Path(db_path)
+        if not db.is_absolute():
+            project_root = Path(__file__).resolve().parent.parent.parent.parent
+            db = project_root / db
         self._store = TrajectoryStore(db)
         self._store.open()
 
@@ -978,6 +1049,10 @@ class Session:
         if duration_ms is None:
             duration_ms = (time.time() - self._started_at) * 1000
 
+        # Aggregate cost from all steps
+        step_costs = [s.get("cost_usd") for s in self._steps if s.get("cost_usd") is not None]
+        total_cost = round(sum(step_costs), 6) if step_costs else None
+
         self._store.ingest_episode(
             episode_metadata={
                 "episode_id": self._episode_id,
@@ -990,6 +1065,7 @@ class Session:
                 "ended_at": ended_at,
                 "is_complete": is_complete,
                 "sandbox_id": self._sandbox_id,
+                "cost_usd": total_cost,
             },
             steps=self._steps,
         )

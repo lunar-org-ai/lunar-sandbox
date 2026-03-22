@@ -267,7 +267,7 @@ class CUAEpisodeRunner:
                 if action_name in ("stop", "done"):
                     outcome = "completed"
                     # Record final step before breaking
-                    self._write_step(writer, step_idx, observation, action_dict, 0.0)
+                    self._write_step(writer, step_idx, observation, action_dict, 0.0, reasoning=reasoning)
                     step_idx += 1
                     self._log.info("cua_episode_agent_stopped", step=step_idx)
                     break
@@ -297,7 +297,7 @@ class CUAEpisodeRunner:
                 action_duration_ms = (time.time() - action_start) * 1000
 
                 # h. Write trajectory step
-                self._write_step(writer, step_idx, observation, action_dict, action_duration_ms)
+                self._write_step(writer, step_idx, observation, action_dict, action_duration_ms, reasoning=reasoning)
                 step_idx += 1
                 self._log.debug("cua_episode_step_complete", step=step_idx)
 
@@ -405,6 +405,7 @@ class CUAEpisodeRunner:
         observation: CUAObservation,
         action_dict: dict[str, Any],
         duration_ms: float,
+        reasoning: str | None = None,
     ) -> None:
         """Serialise a single episode step to the JSONL writer.
 
@@ -416,6 +417,7 @@ class CUAEpisodeRunner:
             observation: The :class:`CUAObservation` captured before the action.
             action_dict: Full action dict returned by the agent.
             duration_ms: Wall-clock execution time of the action in milliseconds.
+            reasoning: Model reasoning text for this step, if available.
         """
         if writer is None:
             return
@@ -423,6 +425,8 @@ class CUAEpisodeRunner:
         action_name = action_dict.get("action", "unknown")
         # Build action_params without the "action" key itself
         action_params = {k: v for k, v in action_dict.items() if k != "action"}
+        if reasoning:
+            action_params["reasoning"] = reasoning
 
         step = TrajectoryStep(
             episode_id=self._episode_id,

@@ -165,6 +165,7 @@ class TrajectoryStore:
             self._conn.execute(idx_sql)
         self._migrate_add_episode_type()
         self._migrate_add_review_notes()
+        self._migrate_add_cost_usd()
 
     def _migrate_add_episode_type(self) -> None:
         """Add episode_type column to episodes table if it doesn't exist.
@@ -199,6 +200,16 @@ class TrajectoryStore:
         if "review_notes" not in columns:
             self._conn.execute("ALTER TABLE episodes ADD COLUMN review_notes TEXT")
             logger.info("migration_review_notes_added")
+
+    def _migrate_add_cost_usd(self) -> None:
+        """Add cost_usd column to episodes table if it doesn't exist."""
+        assert self._conn is not None  # noqa: S101
+        columns = {
+            row[1] for row in self._conn.execute("PRAGMA table_info(episodes)").fetchall()
+        }
+        if "cost_usd" not in columns:
+            self._conn.execute("ALTER TABLE episodes ADD COLUMN cost_usd REAL")
+            logger.info("migration_cost_usd_added")
 
     # -- task registration ---------------------------------------------------
 
@@ -280,8 +291,8 @@ class TrajectoryStore:
                 """INSERT OR REPLACE INTO episodes
                    (episode_id, task_name, outcome, score, step_count,
                     duration_ms, started_at, ended_at, is_complete,
-                    sandbox_id, created_at, episode_type)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    sandbox_id, created_at, episode_type, cost_usd)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     episode_metadata["episode_id"],
                     episode_metadata["task_name"],
@@ -295,6 +306,7 @@ class TrajectoryStore:
                     episode_metadata.get("sandbox_id", ""),
                     created_at,
                     episode_metadata.get("episode_type", "coding"),
+                    episode_metadata.get("cost_usd"),
                 ),
             )
 

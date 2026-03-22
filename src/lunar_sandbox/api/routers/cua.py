@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 
 from lunar_sandbox.api.deps import get_engine
@@ -107,6 +107,7 @@ class _ManualAgent:
 
 @router.post("/episodes", response_model=CUALaunchResponse)
 async def launch_cua_episode(
+    request: Request,
     req: CUALaunchRequest,
     engine=Depends(get_engine),
 ) -> CUALaunchResponse:
@@ -216,12 +217,16 @@ async def launch_cua_episode(
     else:
         agent = _ManualAgent()
 
+    # Wire EventHub for real-time CUA event streaming
+    event_hub = getattr(request.app.state, "event_hub", None)
+
     runner = CUAEpisodeRunner(
         task=task,
         sandbox=sandbox,
         agent=agent,
         episode_id=episode_id,
         trajectory_dir=trajectory_dir,
+        event_hub=event_hub,
     )
 
     # -- Register episode in module-level registry ---------------------------
