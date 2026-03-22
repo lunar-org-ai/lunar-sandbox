@@ -107,19 +107,27 @@ export default function RunDetail() {
     load();
 
     // Poll every 2s while episode is not terminal
+    let pollFailures = 0;
     const interval = setInterval(() => {
       if (cancelled) return;
-      // Re-fetch if not yet complete
-      fetchEpisode(episodeId!)
+      fetchEpisode(episodeId)
         .then((data) => {
           if (cancelled) return;
+          pollFailures = 0;
           setEpisode(data);
-          // Stop polling when episode is terminal
           if (data.is_complete === 1) {
             clearInterval(interval);
           }
         })
-        .catch(() => {});
+        .catch((err: Error) => {
+          if (cancelled) return;
+          pollFailures++;
+          // Surface persistent failures (3+ consecutive) so user knows
+          if (pollFailures >= 3) {
+            setFetchError(`Polling failed: ${err.message}`);
+            clearInterval(interval);
+          }
+        });
     }, 2000);
 
     return () => {

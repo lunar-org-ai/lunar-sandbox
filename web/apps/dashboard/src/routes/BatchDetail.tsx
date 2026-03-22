@@ -34,8 +34,8 @@ export default function BatchDetail() {
   const navigate = useNavigate();
   const { batch, loading, error, liveCost } = useBatchProgress(id ?? null);
 
-  // Metrics tab: WS telemetry stream (hardcoded topic for Phase 13)
-  const { metrics } = useMetricsStream("telemetry:mock-run-1");
+  // Metrics tab: WS telemetry stream scoped to this batch
+  const { metrics } = useMetricsStream(id ? `telemetry:${id}` : null);
 
   if (loading && !batch) {
     return (

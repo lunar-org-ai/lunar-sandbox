@@ -61,6 +61,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
   const wsRef = useRef<WebSocket | null>(null)
   const attemptRef = useRef<number>(0)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const topicsRef = useRef<Set<string>>(new Set())
 
   // Latest-ref pattern: store callbacks in refs so the effect never re-runs
@@ -115,6 +116,20 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
           ws.send(JSON.stringify({ subscribe: topic }))
         }
 
+        // Start heartbeat: send ping every 30s to detect stale connections.
+        // If no pong (or any message) arrives within 10s, force-close to
+        // trigger reconnection via onclose.
+        if (heartbeatRef.current) clearInterval(heartbeatRef.current)
+        heartbeatRef.current = setInterval(() => {
+          if (ws.readyState !== WebSocket.OPEN) return
+          try {
+            ws.send(JSON.stringify({ ping: true }))
+          } catch {
+            // send failed — connection is dead
+            ws.close()
+          }
+        }, 30_000)
+
         onConnectRef.current?.()
       }
 
@@ -135,27 +150,29 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       ws.onclose = () => {
         if (disposed) return
 
+        if (heartbeatRef.current) {
+          clearInterval(heartbeatRef.current)
+          heartbeatRef.current = null
+        }
+
         wsRef.current = null
 
-        if (attemptRef.current < maxAttempts) {
-          const isFirstReconnect = attemptRef.current === 0
-          setReadyState('reconnecting')
+        const isFirstReconnect = attemptRef.current === 0
+        setReadyState('reconnecting')
 
-          if (isFirstReconnect) {
-            onReconnectRef.current?.()
-          }
-
-          const delay = getDelay(attemptRef.current, baseDelay, maxDelay)
-          attemptRef.current += 1
-
-          reconnectTimerRef.current = setTimeout(() => {
-            reconnectTimerRef.current = null
-            connect()
-          }, delay)
-        } else {
-          setReadyState('disconnected')
-          onDisconnectRef.current?.()
+        if (isFirstReconnect) {
+          onReconnectRef.current?.()
         }
+
+        // Cap attempt index for backoff calculation but never stop retrying.
+        // maxDelay (default 30s) is the ceiling, so capping at 20 is fine.
+        const delay = getDelay(Math.min(attemptRef.current, 20), baseDelay, maxDelay)
+        attemptRef.current += 1
+
+        reconnectTimerRef.current = setTimeout(() => {
+          reconnectTimerRef.current = null
+          connect()
+        }, delay)
       }
     }
 
@@ -172,6 +189,11 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       if (reconnectTimerRef.current !== null) {
         clearTimeout(reconnectTimerRef.current)
         reconnectTimerRef.current = null
+      }
+
+      if (heartbeatRef.current !== null) {
+        clearInterval(heartbeatRef.current)
+        heartbeatRef.current = null
       }
 
       const ws = wsRef.current

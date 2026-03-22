@@ -38,6 +38,8 @@ export function useBatchProgress(batchId: string | null): UseBatchProgressReturn
   const topic = batchId ? `batch:${batchId}` : null
   const { events } = useEventStream({ topic })
 
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   // Fetch batch data from REST
   async function doFetch() {
     const id = batchIdRef.current
@@ -47,6 +49,15 @@ export function useBatchProgress(batchId: string | null): UseBatchProgressReturn
     try {
       const data = await fetchBatch(id)
       setBatch(data)
+
+      // Stop polling once batch is terminal
+      const status = (data as unknown as Record<string, unknown>)['status']
+      if (status === 'completed' || status === 'failed' || status === 'cancelled') {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current)
+          intervalRef.current = null
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load batch.')
     } finally {
@@ -65,12 +76,15 @@ export function useBatchProgress(batchId: string | null): UseBatchProgressReturn
 
     doFetch()
 
-    const intervalId = setInterval(() => {
+    intervalRef.current = setInterval(() => {
       doFetch()
     }, POLL_INTERVAL_MS)
 
     return () => {
-      clearInterval(intervalId)
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [batchId])

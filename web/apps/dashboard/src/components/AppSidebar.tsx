@@ -1,4 +1,4 @@
-import { Activity, Command, Download, Home, List, Play } from "lucide-react";
+import { Activity, Command, Download, Home, List, Monitor, Play } from "lucide-react";
 import { Link, useLocation } from "react-router";
 
 import {
@@ -19,6 +19,7 @@ const navItems = [
   { title: "Home", url: "/", icon: Home },
   { title: "New Run", url: "/launcher", icon: Play },
   { title: "Runs", url: "/runs", icon: List },
+  { title: "CUA", url: "/cua", icon: Monitor, badge: "Beta" },
   { title: "Pool", url: "/pool", icon: Activity },
   { title: "Export", url: "/export", icon: Download },
 ];
@@ -59,6 +60,11 @@ export function AppSidebar() {
                   <Link to={item.url}>
                     <item.icon className="size-4" />
                     <span>{item.title}</span>
+                    {"badge" in item && item.badge && (
+                      <Badge variant="secondary" className="ml-auto text-[10px] px-1.5 py-0">
+                        {item.badge}
+                      </Badge>
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

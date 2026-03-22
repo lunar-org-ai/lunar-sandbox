@@ -34,7 +34,6 @@ import {
   type EpisodeSummary,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import CUALauncher from "@/routes/CUALauncher";
 
 function formatDuration(ms: number): string {
   if (ms <= 0) return "--";
@@ -381,7 +380,6 @@ export default function Runs() {
         <TabsList>
           <TabsTrigger value="episodes">Episodes</TabsTrigger>
           <TabsTrigger value="batches">Batches</TabsTrigger>
-          <TabsTrigger value="new-cua">New CUA Episode</TabsTrigger>
         </TabsList>
 
         <TabsContent value="episodes">
@@ -421,7 +419,7 @@ export default function Runs() {
               <CardContent>
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto]">
                   <div className="flex flex-wrap items-center gap-2">
-                    {(["pass", "fail", "error"] as const).map((outcome) => (
+                    {(["completed", "failed", "error", "running", "timeout"] as const).map((outcome) => (
                       <Label
                         key={outcome}
                         className={cn(
@@ -554,9 +552,6 @@ export default function Runs() {
           <BatchesTab />
         </TabsContent>
 
-        <TabsContent value="new-cua">
-          <CUALauncher />
-        </TabsContent>
       </Tabs>
     </div>
   );

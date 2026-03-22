@@ -13,13 +13,16 @@ function triggerDownload(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url)
 }
 
-export function downloadJson(data: unknown, filename: string): void {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+export function downloadJson(data: unknown, filename: string): number {
+  const arr = Array.isArray(data) ? data : []
+  if (arr.length === 0) return 0
+  const blob = new Blob([JSON.stringify(arr, null, 2)], { type: 'application/json' })
   triggerDownload(blob, `${filename}.json`)
+  return arr.length
 }
 
-export function downloadCsv(rows: Record<string, unknown>[], filename: string): void {
-  if (rows.length === 0) return
+export function downloadCsv(rows: Record<string, unknown>[], filename: string): number {
+  if (rows.length === 0) return 0
   const headers = Object.keys(rows[0])
   const lines = [
     headers.map((h) => JSON.stringify(h)).join(','),
@@ -36,6 +39,7 @@ export function downloadCsv(rows: Record<string, unknown>[], filename: string): 
   ]
   const blob = new Blob([lines.join('\n')], { type: 'text/csv' })
   triggerDownload(blob, `${filename}.csv`)
+  return rows.length
 }
 
 /**

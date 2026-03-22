@@ -58,18 +58,31 @@ export default function CUALiveView() {
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ---------------------------------------------------------------------------
-  // Episode polling (every 3 seconds)
+  // Episode polling (every 3 seconds, stops when terminal)
   // ---------------------------------------------------------------------------
+  const [pollError, setPollError] = useState<string | null>(null);
+  const pollFailuresRef = useRef(0);
+
   const pollEpisode = useCallback(async () => {
     if (!episodeId) return;
     try {
       const info = await fetchCUAEpisodeDetail(episodeId);
+      pollFailuresRef.current = 0;
+      setPollError(null);
       setEpisodeInfo(info);
       if (info.outcome && info.outcome !== "running") {
         setComplete(true);
+        // Stop polling once episode is terminal
+        if (pollTimerRef.current) {
+          clearInterval(pollTimerRef.current);
+          pollTimerRef.current = null;
+        }
       }
-    } catch {
-      // Silently ignore poll errors
+    } catch (err) {
+      pollFailuresRef.current++;
+      if (pollFailuresRef.current >= 3) {
+        setPollError(err instanceof Error ? err.message : "Poll failed");
+      }
     }
   }, [episodeId]);
 
@@ -166,6 +179,12 @@ export default function CUALiveView() {
         <Badge variant={isRunning ? "secondary" : "default"}>
           {statusLabel}
         </Badge>
+
+        {pollError && (
+          <span className="text-xs text-destructive truncate max-w-48">
+            {pollError}
+          </span>
+        )}
 
         {/* Elapsed time */}
         <span className="font-mono text-xs text-muted-foreground tabular-nums">

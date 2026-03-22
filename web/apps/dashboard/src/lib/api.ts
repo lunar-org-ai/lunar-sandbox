@@ -27,9 +27,61 @@ export type PaginatedBatches = components['schemas']['PaginatedBatches']
 // Fetch utilities (hand-written, types-only codegen per locked decision)
 // ---------------------------------------------------------------------------
 
+const REQUEST_TIMEOUT_MS = 15_000
+const MAX_RETRIES = 2
+const RETRY_DELAY_MS = 1000
+const RETRYABLE_STATUS = new Set([502, 503, 504])
+
+async function fetchWithRetry(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+    try {
+      const res = await fetch(input, { ...init, signal: controller.signal })
+      clearTimeout(timeout)
+
+      if (res.ok) return res
+
+      // Only retry on transient server errors, not 4xx
+      if (RETRYABLE_STATUS.has(res.status) && attempt < MAX_RETRIES) {
+        lastError = new Error(`API error ${res.status}: ${res.statusText}`)
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)))
+        continue
+      }
+
+      const body = await res.text().catch(() => '')
+      throw new Error(
+        `API error ${res.status}: ${body || res.statusText}`,
+      )
+    } catch (err) {
+      clearTimeout(timeout)
+
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        lastError = new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`)
+      } else if (err instanceof Error && err.message.startsWith('API error')) {
+        throw err
+      } else {
+        lastError = err instanceof Error ? err : new Error(String(err))
+      }
+
+      if (attempt < MAX_RETRIES) {
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)))
+        continue
+      }
+    }
+  }
+
+  throw lastError ?? new Error('Request failed')
+}
+
 export async function fetchHealth(): Promise<HealthResponse> {
-  const res = await fetch('/api/health')
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  const res = await fetchWithRetry('/api/health')
   return res.json()
 }
 
@@ -55,35 +107,30 @@ export async function fetchEpisodes(params?: {
   if (params?.sort_by) searchParams.set('sort_by', params.sort_by)
   if (params?.sort_order) searchParams.set('sort_order', params.sort_order)
   const query = searchParams.toString()
-  const res = await fetch(`/api/episodes${query ? `?${query}` : ''}`)
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  const res = await fetchWithRetry(`/api/episodes${query ? `?${query}` : ''}`)
   return res.json()
 }
 
 export async function fetchEpisode(episodeId: string): Promise<EpisodeDetail> {
-  const res = await fetch(`/api/episodes/${encodeURIComponent(episodeId)}`)
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  const res = await fetchWithRetry(`/api/episodes/${encodeURIComponent(episodeId)}`)
   return res.json()
 }
 
 export async function fetchSandboxes(): Promise<PoolStatus> {
-  const res = await fetch('/api/sandboxes')
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  const res = await fetchWithRetry('/api/sandboxes')
   return res.json()
 }
 
 export async function fetchSandbox(sandboxId: string): Promise<SandboxInfo> {
-  const res = await fetch(`/api/sandboxes/${encodeURIComponent(sandboxId)}`)
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  const res = await fetchWithRetry(`/api/sandboxes/${encodeURIComponent(sandboxId)}`)
   return res.json()
 }
 
 export async function stopSandbox(sandboxId: string): Promise<{ status: string }> {
-  const res = await fetch(`/api/sandboxes/${encodeURIComponent(sandboxId)}/stop`, {
+  const res = await fetchWithRetry(`/api/sandboxes/${encodeURIComponent(sandboxId)}/stop`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   })
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
   return res.json()
 }
 
@@ -96,12 +143,11 @@ export async function launchRun(params: {
   cpu_cores?: number
   memory_mb?: number
 }): Promise<RunLaunchResponse> {
-  const res = await fetch('/api/runs', {
+  const res = await fetchWithRetry('/api/runs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
   })
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
   return res.json()
 }
 
@@ -113,8 +159,7 @@ export async function fetchTasks(params?: {
   if (params?.offset !== undefined) searchParams.set('offset', String(params.offset))
   if (params?.limit !== undefined) searchParams.set('limit', String(params.limit))
   const query = searchParams.toString()
-  const res = await fetch(`/api/tasks${query ? `?${query}` : ''}`)
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  const res = await fetchWithRetry(`/api/tasks${query ? `?${query}` : ''}`)
   return res.json()
 }
 
@@ -126,20 +171,18 @@ export async function createTask(task: {
   instructions?: string
   test_command?: string
 }): Promise<TaskSummary> {
-  const res = await fetch('/api/tasks', {
+  const res = await fetchWithRetry('/api/tasks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(task),
   })
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
   return res.json()
 }
 
 export async function deleteTask(taskName: string): Promise<void> {
-  const res = await fetch(`/api/tasks/${encodeURIComponent(taskName)}`, {
+  await fetchWithRetry(`/api/tasks/${encodeURIComponent(taskName)}`, {
     method: 'DELETE',
   })
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
 }
 
 export async function fetchTelemetryRuns(params?: {
@@ -150,8 +193,7 @@ export async function fetchTelemetryRuns(params?: {
   if (params?.offset !== undefined) searchParams.set('offset', String(params.offset))
   if (params?.limit !== undefined) searchParams.set('limit', String(params.limit))
   const query = searchParams.toString()
-  const res = await fetch(`/api/telemetry${query ? `?${query}` : ''}`)
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  const res = await fetchWithRetry(`/api/telemetry${query ? `?${query}` : ''}`)
   return res.json()
 }
 
@@ -163,20 +205,17 @@ export async function fetchBatches(params?: {
   if (params?.offset !== undefined) searchParams.set('offset', String(params.offset))
   if (params?.limit !== undefined) searchParams.set('limit', String(params.limit))
   const query = searchParams.toString()
-  const res = await fetch(`/api/batches${query ? `?${query}` : ''}`)
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  const res = await fetchWithRetry(`/api/batches${query ? `?${query}` : ''}`)
   return res.json()
 }
 
 export async function fetchBatch(batchId: string): Promise<BatchDetail> {
-  const res = await fetch(`/api/batches/${encodeURIComponent(batchId)}`)
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  const res = await fetchWithRetry(`/api/batches/${encodeURIComponent(batchId)}`)
   return res.json()
 }
 
 export async function fetchPoolHealth(): Promise<PoolHealthDetail> {
-  const res = await fetch('/api/pool/health')
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  const res = await fetchWithRetry('/api/pool/health')
   return res.json()
 }
 
@@ -223,12 +262,11 @@ export interface CUAScoreResponse {
 }
 
 export async function launchCUAEpisode(params: CUALaunchParams): Promise<CUALaunchResponse> {
-  const res = await fetch('/api/cua/episodes', {
+  const res = await fetchWithRetry('/api/cua/episodes', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
   })
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
   return res.json()
 }
 
@@ -240,14 +278,12 @@ export async function fetchCUAEpisodes(params?: {
   if (params?.offset !== undefined) searchParams.set('offset', String(params.offset))
   if (params?.limit !== undefined) searchParams.set('limit', String(params.limit))
   const query = searchParams.toString()
-  const res = await fetch(`/api/cua/episodes${query ? `?${query}` : ''}`)
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  const res = await fetchWithRetry(`/api/cua/episodes${query ? `?${query}` : ''}`)
   return res.json()
 }
 
 export async function fetchCUAEpisodeDetail(episodeId: string): Promise<CUAEpisodeInfo> {
-  const res = await fetch(`/api/cua/episodes/${encodeURIComponent(episodeId)}`)
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  const res = await fetchWithRetry(`/api/cua/episodes/${encodeURIComponent(episodeId)}`)
   return res.json()
 }
 
@@ -256,12 +292,11 @@ export async function scoreCUAEpisode(
   score: number,
   notes?: string,
 ): Promise<CUAScoreResponse> {
-  const res = await fetch(`/api/cua/episodes/${encodeURIComponent(episodeId)}/score`, {
+  const res = await fetchWithRetry(`/api/cua/episodes/${encodeURIComponent(episodeId)}/score`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ score, notes }),
   })
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
   return res.json()
 }
 

@@ -75,7 +75,7 @@ function StatsBar({ data }: StatsBarProps) {
             Pool Running
           </span>
           <span className="text-sm font-semibold">
-            {data.running ? "Yes" : "No (mock)"}
+            {data.running ? "Yes" : "No"}
           </span>
         </div>
       </CardContent>

@@ -546,14 +546,24 @@ export default function EpisodeReplay() {
         );
         setSpans(steps);
 
-        // Detect CUA episode: episode_type field or screenshot_path in any step observation
-        const hasCUAType =
-          (data as unknown as Record<string, unknown>)["episode_type"] ===
-          "cua";
-        const hasScreenshots = steps.some(
-          (s) => typeof s.observation["screenshot_path"] === "string",
-        );
-        setIsCUA(hasCUAType || hasScreenshots);
+        // Detect CUA episode: prefer explicit episode_type field.
+        // Only fall back to screenshot heuristic if episode_type is absent
+        // (legacy episodes before the field was added).
+        const episodeType = (data as unknown as Record<string, unknown>)[
+          "episode_type"
+        ];
+        if (typeof episodeType === "string") {
+          setIsCUA(episodeType === "cua");
+        } else {
+          // Legacy fallback: check if ALL steps have screenshot_path
+          // (a single step with it could be a coding episode with a screenshot tool)
+          const allHaveScreenshots =
+            steps.length > 0 &&
+            steps.every(
+              (s) => typeof s.observation["screenshot_path"] === "string",
+            );
+          setIsCUA(allHaveScreenshots);
+        }
 
         setLoading(false);
       })

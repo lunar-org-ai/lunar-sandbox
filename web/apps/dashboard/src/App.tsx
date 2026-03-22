@@ -18,6 +18,7 @@ import BatchDetail from "@/routes/BatchDetail";
 import EpisodeReplay from "@/routes/EpisodeReplay";
 import Export from "@/routes/Export";
 import PoolHealth from "@/routes/PoolHealth";
+import CUA from "@/routes/CUA";
 import CUALiveView from "@/routes/CUALiveView";
 
 function AppShell() {
@@ -82,6 +83,7 @@ function AppShell() {
               <Route path="/replay/:id" element={<EpisodeReplay />} />
               <Route path="/export" element={<Export />} />
               <Route path="/pool" element={<PoolHealth />} />
+              <Route path="/cua" element={<CUA />} />
               <Route path="/cua/live/:id" element={<CUALiveView />} />
             </Routes>
           </main>

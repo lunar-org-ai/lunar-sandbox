@@ -77,7 +77,7 @@ export function useTraceStream(options: UseTraceStreamOptions): UseTraceStreamRe
 
     const payload = lastEvent.payload as Record<string, unknown>
 
-    // Normalize action field (mock uses "action_type", real engine may use "action")
+    // Normalize action field (some events use "action_type" instead of "action")
     const action = ((payload['action'] ?? payload['action_type'] ?? 'unknown') as string)
 
     // Calculate startMs relative to episode start

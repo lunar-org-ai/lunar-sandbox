@@ -56,7 +56,7 @@ export default function CUALauncher() {
 
   // Core fields
   const [instruction, setInstruction] = useState("");
-  const [agentMode, setAgentMode] = useState<AgentMode>("manual");
+  const [agentMode, setAgentMode] = useState<AgentMode>("model");
   const [rewardType, setRewardType] = useState<RewardType>("manual");
 
   // API key (for model mode)
