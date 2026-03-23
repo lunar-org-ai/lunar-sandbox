@@ -4,9 +4,9 @@ Isolated Docker sandboxes for evaluating AI agents -- both **coding agents** (sh
 
 Every action is traced to a real-time dashboard with step replay, cost tracking, and batch analytics.
 
-![Demo](assets/demo.gif)
+<img src="assets/demo.gif" alt="Demo" width="400">
 
-![CUA Demo](assets/cua-demo.gif)
+<img src="assets/cua-demo.gif" alt="CUA Demo" width="400">
 
 ```
                   ┌─────────────────────────────────────┐
