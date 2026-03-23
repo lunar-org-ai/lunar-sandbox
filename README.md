@@ -6,6 +6,8 @@ Every action is traced to a real-time dashboard with step replay, cost tracking,
 
 https://github.com/user-attachments/assets/2c353c86-bfd6-4fa0-b0ab-bc397fb5fdee
 
+https://github.com/user-attachments/assets/7d72705e-00f3-4f41-81b4-6a731f0b7c81
+
 ```
                   ┌─────────────────────────────────────┐
                   │         Your AI Agent Code           │
