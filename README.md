@@ -4,9 +4,9 @@ Isolated Docker sandboxes for evaluating AI agents -- both **coding agents** (sh
 
 Every action is traced to a real-time dashboard with step replay, cost tracking, and batch analytics.
 
-https://github.com/lunar-org-ai/lunar-sandbox/raw/main/assets/demo.mp4
+![Demo](assets/demo.gif)
 
-https://github.com/lunar-org-ai/lunar-sandbox/raw/main/assets/cua-demo.mp4
+![CUA Demo](assets/cua-demo.gif)
 
 ```
                   ┌─────────────────────────────────────┐
