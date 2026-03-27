@@ -49,13 +49,59 @@ https://github.com/user-attachments/assets/7d72705e-00f3-4f41-81b4-6a731f0b7c81
 
 ## Quick Start
 
-```bash
-# Install dependencies and build the CUA Docker image
-make setup
+### 1. Clone & install
 
-# Start the API server (port 8000) and dashboard (port 3000)
+```bash
+git clone https://github.com/lunar-org-ai/lunar-sandbox.git
+cd lunar-sandbox
+
+# Install Python deps, Node deps, and build the CUA Docker image (one command)
+make setup
+```
+
+### 2. Start the servers
+
+```bash
+# Starts FastAPI on http://localhost:8000 and the dashboard on http://localhost:3000
 make dev
 ```
+
+### 3. Run your first agent (Python)
+
+```bash
+pip install openai  # or: pip install anthropic
+```
+
+```python
+from openai import OpenAI
+from lunar_sandbox import Session, openai_adapter
+
+client = OpenAI()  # uses OPENAI_API_KEY env var
+
+with Session("hello-world") as s:
+    s.agent_loop(
+        task="Create a Python script that prints the Fibonacci sequence up to 100, then run it",
+        call_llm=openai_adapter(client, model="gpt-4o"),
+    )
+```
+
+Open **http://localhost:3000** to watch the agent live in the dashboard.
+
+### 4. Run a Computer-Using Agent (GUI)
+
+```bash
+# Launch a CUA episode via the API
+curl -X POST http://localhost:8000/api/cua/episodes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instruction": "Open Chromium and search Google for the weather in New York",
+    "start_url": "https://google.com",
+    "max_steps": 30,
+    "time_limit": 120
+  }'
+```
+
+Or use the **CUA Launcher** in the dashboard at http://localhost:3000 for a visual interface with live desktop streaming.
 
 ## SDK
 
