@@ -340,7 +340,7 @@ class AzureWindowsProvider:
         config = AzureWindowsProviderConfig(
             resource_group="my-rg",
             vm_name="cua-win-01",
-            admin_password="MyP@ssw0rd123!",
+            admin_password="<your-password-here>",
         )
         provider = AzureWindowsProvider(config)
         provider.start()  # Creates VM if not exists, starts if stopped

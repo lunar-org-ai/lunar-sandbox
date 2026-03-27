@@ -13,7 +13,7 @@ Usage::
 
     # Anthropic (default)
     provider = AnthropicProvider(
-        api_key="sk-...",
+        api_key="<your-api-key>",
         instruction="Open the calculator",
         screen_size=(1280, 800),
     )

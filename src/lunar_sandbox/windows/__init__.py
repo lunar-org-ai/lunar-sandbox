@@ -50,7 +50,7 @@ Quick start (Azure VM)::
     provider = AzureWindowsProvider(AzureWindowsProviderConfig(
         resource_group="my-rg",
         vm_name="cua-win-01",
-        admin_password="MyP@ssw0rd123!",
+        admin_password="<your-password-here>",
     ))
     provider.start()
     ssh = provider.get_ssh_config()

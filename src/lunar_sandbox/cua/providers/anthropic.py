@@ -6,7 +6,7 @@ Calls the Anthropic Messages API directly via httpx with the
 Usage::
 
     provider = AnthropicProvider(
-        api_key="sk-ant-...",
+        api_key="<your-api-key>",
         instruction="Open the calculator and compute 42 * 17",
         screen_size=(1280, 800),
         os_hint="linux",
