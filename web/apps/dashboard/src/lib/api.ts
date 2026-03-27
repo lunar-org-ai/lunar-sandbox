@@ -235,11 +235,26 @@ export interface CUALaunchParams {
   script_content?: string
   reference_image_url?: string
   screenshot_threshold?: number
+  // Platform selection
+  platform?: 'linux' | 'windows'
+  // Model provider
+  model_provider?: 'anthropic' | 'azure_openai'
+  // Azure OpenAI settings
+  azure_openai_endpoint?: string
+  azure_openai_deployment?: string
+  azure_openai_api_key?: string
+  // Windows VM settings
+  windows_ssh_host?: string
+  windows_ssh_port?: number
+  windows_ssh_user?: string
+  windows_ssh_password?: string
+  windows_ssh_key_path?: string
 }
 
 export interface CUALaunchResponse {
   episode_id: string
   vnc_url: string
+  rdp_url?: string | null
 }
 
 export interface CUAEpisodeInfo {
@@ -253,6 +268,7 @@ export interface CUAEpisodeInfo {
   started_at: number
   ended_at: number | null
   episode_type: string
+  platform: string | null
 }
 
 export interface CUAScoreResponse {
@@ -312,4 +328,13 @@ export function cuaVncWebSocketUrl(episodeId: string): string {
   const host = window.location.hostname
   const apiPort = '8000'
   return `${protocol}//${host}:${apiPort}/api/cua/vnc/${encodeURIComponent(episodeId)}`
+}
+
+export function cuaScreenStreamUrl(episodeId: string): string {
+  // WebSocket URL for Windows VM screenshot streaming.
+  // Same direct-to-FastAPI pattern as VNC to avoid Vite proxy issues.
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const host = window.location.hostname
+  const apiPort = '8000'
+  return `${protocol}//${host}:${apiPort}/api/cua/screen/${encodeURIComponent(episodeId)}`
 }

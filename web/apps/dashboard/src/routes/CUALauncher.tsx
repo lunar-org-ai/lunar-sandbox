@@ -34,10 +34,24 @@ import { launchCUAEpisode } from "@/lib/api";
 
 const AGENT_MODES = [
   { value: "manual", label: "Manual (view-only sandbox)" },
-  { value: "model", label: "AI Model (Claude computer-use)" },
+  { value: "model", label: "AI Model (autonomous)" },
 ] as const;
 
 type AgentMode = (typeof AGENT_MODES)[number]["value"];
+
+const PLATFORMS = [
+  { value: "linux", label: "Linux (Docker)" },
+  { value: "windows", label: "Windows (VM)" },
+] as const;
+
+type Platform = (typeof PLATFORMS)[number]["value"];
+
+const MODEL_PROVIDERS = [
+  { value: "anthropic", label: "Anthropic (Claude)" },
+  { value: "azure_openai", label: "Azure OpenAI" },
+] as const;
+
+type ModelProvider = (typeof MODEL_PROVIDERS)[number]["value"];
 
 const REWARD_TYPES = [
   { value: "manual", label: "Manual Review" },
@@ -57,10 +71,23 @@ export default function CUALauncher() {
   // Core fields
   const [instruction, setInstruction] = useState("");
   const [agentMode, setAgentMode] = useState<AgentMode>("model");
+  const [platform, setPlatform] = useState<Platform>("linux");
+  const [modelProvider, setModelProvider] = useState<ModelProvider>("anthropic");
   const [rewardType, setRewardType] = useState<RewardType>("manual");
 
   // API key (for model mode)
   const [apiKey, setApiKey] = useState("");
+
+  // Azure OpenAI settings
+  const [azureEndpoint, setAzureEndpoint] = useState("");
+  const [azureDeployment, setAzureDeployment] = useState("");
+  const [azureApiKey, setAzureApiKey] = useState("");
+
+  // Windows VM settings
+  const [windowsSshHost, setWindowsSshHost] = useState("");
+  const [windowsSshPort, setWindowsSshPort] = useState("22");
+  const [windowsSshUser, setWindowsSshUser] = useState("lunar");
+  const [windowsSshPassword, setWindowsSshPassword] = useState("");
 
   // Script reward
   const [scriptContent, setScriptContent] = useState("");
@@ -98,13 +125,52 @@ export default function CUALauncher() {
       return;
     }
 
+    // Windows validation
+    if (platform === "windows" && !windowsSshHost.trim()) {
+      setValidationError("SSH Host is required for Windows platform.");
+      return;
+    }
+    if (agentMode === "model" && modelProvider === "azure_openai") {
+      if (!azureEndpoint.trim() || !azureDeployment.trim()) {
+        setValidationError("Azure OpenAI endpoint and deployment are required.");
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const response = await launchCUAEpisode({
         instruction: instruction.trim(),
         agent_mode: agentMode,
         reward_type: rewardType,
-        api_key: agentMode === "model" && apiKey.trim() ? apiKey.trim() : undefined,
+        platform,
+        model_provider: agentMode === "model" ? modelProvider : undefined,
+        api_key:
+          agentMode === "model" && modelProvider === "anthropic" && apiKey.trim()
+            ? apiKey.trim()
+            : undefined,
+        azure_openai_endpoint:
+          agentMode === "model" && modelProvider === "azure_openai"
+            ? azureEndpoint.trim() || undefined
+            : undefined,
+        azure_openai_deployment:
+          agentMode === "model" && modelProvider === "azure_openai"
+            ? azureDeployment.trim() || undefined
+            : undefined,
+        azure_openai_api_key:
+          agentMode === "model" && modelProvider === "azure_openai" && azureApiKey.trim()
+            ? azureApiKey.trim()
+            : undefined,
+        windows_ssh_host:
+          platform === "windows" ? windowsSshHost.trim() || undefined : undefined,
+        windows_ssh_port:
+          platform === "windows" ? parseInt(windowsSshPort, 10) : undefined,
+        windows_ssh_user:
+          platform === "windows" ? windowsSshUser.trim() || undefined : undefined,
+        windows_ssh_password:
+          platform === "windows" && windowsSshPassword.trim()
+            ? windowsSshPassword.trim()
+            : undefined,
         script_content:
           rewardType === "script" ? scriptContent || undefined : undefined,
         reference_image_url:
@@ -121,7 +187,11 @@ export default function CUALauncher() {
         time_limit: timeLimit ? parseFloat(timeLimit) : undefined,
       });
       navigate(`/cua/live/${response.episode_id}`, {
-        state: { vncUrl: response.vnc_url },
+        state: {
+          vncUrl: response.vnc_url,
+          rdpUrl: response.rdp_url,
+          platform,
+        },
       });
     } catch (e) {
       setSubmitError(
@@ -205,8 +275,116 @@ export default function CUALauncher() {
             </p>
           </div>
 
-          {/* API Key (model mode only) */}
+          {/* Platform */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">
+              Platform
+            </label>
+            <Select
+              value={platform}
+              onValueChange={(v) => setPlatform(v as Platform)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PLATFORMS.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {platform === "windows"
+                ? "Connects to a Windows VM via SSH. Watch live via RDP."
+                : "Runs in a Docker container with noVNC live viewer."}
+            </p>
+          </div>
+
+          {/* Windows VM settings */}
+          {platform === "windows" && (
+            <div className="space-y-4 rounded-lg border border-border p-4">
+              <p className="text-sm font-medium text-foreground">
+                Windows VM Connection
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5 col-span-2">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    SSH Host
+                  </label>
+                  <Input
+                    placeholder="e.g., 20.85.123.45"
+                    value={windowsSshHost}
+                    onChange={(e) => setWindowsSshHost(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    SSH Port
+                  </label>
+                  <Input
+                    type="number"
+                    placeholder="22"
+                    value={windowsSshPort}
+                    onChange={(e) => setWindowsSshPort(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Username
+                  </label>
+                  <Input
+                    placeholder="lunar"
+                    value={windowsSshUser}
+                    onChange={(e) => setWindowsSshUser(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5 col-span-2">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Password
+                  </label>
+                  <Input
+                    type="password"
+                    placeholder="VM password"
+                    value={windowsSshPassword}
+                    onChange={(e) => setWindowsSshPassword(e.target.value)}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                The Windows VM must have OpenSSH Server enabled and the CUA
+                helper script installed.
+              </p>
+            </div>
+          )}
+
+          {/* Model Provider (model mode only) */}
           {agentMode === "model" && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">
+                Model Provider
+              </label>
+              <Select
+                value={modelProvider}
+                onValueChange={(v) => setModelProvider(v as ModelProvider)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MODEL_PROVIDERS.map((mp) => (
+                    <SelectItem key={mp.value} value={mp.value}>
+                      {mp.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Anthropic API Key */}
+          {agentMode === "model" && modelProvider === "anthropic" && (
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
                 Anthropic API Key
@@ -220,6 +398,51 @@ export default function CUALauncher() {
               <p className="text-xs text-muted-foreground">
                 Falls back to the server&apos;s ANTHROPIC_API_KEY environment variable if left blank.
               </p>
+            </div>
+          )}
+
+          {/* Azure OpenAI settings */}
+          {agentMode === "model" && modelProvider === "azure_openai" && (
+            <div className="space-y-4 rounded-lg border border-border p-4">
+              <p className="text-sm font-medium text-foreground">
+                Azure OpenAI Configuration
+              </p>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Endpoint
+                  </label>
+                  <Input
+                    placeholder="https://my-resource.openai.azure.com"
+                    value={azureEndpoint}
+                    onChange={(e) => setAzureEndpoint(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Deployment Name
+                  </label>
+                  <Input
+                    placeholder="computer-use-preview"
+                    value={azureDeployment}
+                    onChange={(e) => setAzureDeployment(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    API Key
+                  </label>
+                  <Input
+                    type="password"
+                    placeholder="Azure OpenAI API key"
+                    value={azureApiKey}
+                    onChange={(e) => setAzureApiKey(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Falls back to the server&apos;s AZURE_OPENAI_API_KEY environment variable if left blank.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 

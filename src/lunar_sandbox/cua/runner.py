@@ -119,7 +119,8 @@ class CUAEpisodeRunner:
 
     Args:
         task: Task definition specifying the instruction, limits, and reward.
-        sandbox: A :class:`CUASandbox` that is already in ``RUNNING`` state.
+        sandbox: A :class:`CUASandbox` (or :class:`WindowsCUASandbox`) that
+            is already in ``RUNNING`` state.
         agent: Any callable with signature ``(CUAObservation) -> dict``.
             Async callables are awaited directly; sync callables are wrapped
             with ``asyncio.to_thread``.
@@ -127,6 +128,9 @@ class CUAEpisodeRunner:
             ``"cua-ep-{8 hex chars}"`` if not provided.
         trajectory_dir: Root directory for JSONL and screenshot storage.
             If ``None``, no files are written and SQLite ingestion is skipped.
+        handler: Optional pre-built action handler (e.g.
+            :class:`WindowsCUAActionHandler`). If ``None``, a default
+            :class:`CUAActionHandler` is created from the sandbox.
     """
 
     def __init__(
@@ -137,6 +141,7 @@ class CUAEpisodeRunner:
         episode_id: str | None = None,
         trajectory_dir: Path | None = None,
         event_hub: Any | None = None,
+        handler: Any | None = None,
     ) -> None:
         self._task = task
         self._sandbox = sandbox
@@ -144,7 +149,7 @@ class CUAEpisodeRunner:
         self._episode_id = episode_id or f"cua-ep-{uuid4().hex[:8]}"
         self._trajectory_dir = trajectory_dir
         self._event_hub = event_hub
-        self._handler = CUAActionHandler(sandbox, sandbox._cua_config)
+        self._handler = handler or CUAActionHandler(sandbox, sandbox._cua_config)
         self._agent_is_async = asyncio.iscoroutinefunction(agent) or asyncio.iscoroutinefunction(getattr(agent, '__call__', None))
         self._log = log.bind(episode_id=self._episode_id)
 
@@ -177,16 +182,27 @@ class CUAEpisodeRunner:
         # -- 3. Launch start_url if provided --------------------------------
         if self._task.start_url:
             self._log.info("cua_episode_launching_url", url=self._task.start_url)
-            self._sandbox.execute(
-                f"chromium-browser-wrapper {self._task.start_url} &",
-                timeout=10,
-            )
-            await asyncio.sleep(2)  # Give Chromium time to load
+            # Detect Windows sandbox by checking for WindowsCUASandbox type
+            is_windows = type(self._sandbox).__name__ == "WindowsCUASandbox"
+            if is_windows:
+                self._sandbox.execute(
+                    f'start "" "{self._task.start_url}"',
+                    timeout=15,
+                )
+                await asyncio.sleep(5)  # Windows browser startup is slower
+            else:
+                self._sandbox.execute(
+                    f"chromium-browser-wrapper {self._task.start_url} &",
+                    timeout=10,
+                )
+                await asyncio.sleep(2)  # Give Chromium time to load
 
         # -- 4. Publish episode start event ---------------------------------
+        platform = "windows" if hasattr(self._sandbox, '_skip_cursor_position') else "linux"
         self._publish("cua_episode_start", {
             "episode_id": self._episode_id,
             "instruction": self._task.instruction,
+            "platform": platform,
         })
 
         # -- 5. Main action loop -------------------------------------------
@@ -223,11 +239,14 @@ class CUAEpisodeRunner:
                     raw_bytes = base64.b64decode(b64_screenshot)
                     (screenshots_dir / screenshot_filename).write_bytes(raw_bytes)
 
-                # b. Get cursor position
-                try:
-                    cursor_pos = self._handler.cursor_position()
-                except Exception:
-                    cursor_pos = None
+                # b. Get cursor position (skip for slow backends like Azure
+                #    run-command where each call adds ~30s latency)
+                cursor_pos = None
+                if not getattr(self._sandbox, '_skip_cursor_position', False):
+                    try:
+                        cursor_pos = self._handler.cursor_position()
+                    except Exception:
+                        cursor_pos = None
 
                 # c. Build observation
                 observation = CUAObservation(
@@ -247,6 +266,16 @@ class CUAEpisodeRunner:
 
                 # e. Publish agent reasoning + action via WebSocket
                 reasoning = getattr(self._agent, "last_reasoning", None)
+
+                # Re-publish start event on step 0 so late-connecting
+                # dashboards still see the task instruction.
+                if step_idx == 0:
+                    self._publish("cua_episode_start", {
+                        "episode_id": self._episode_id,
+                        "instruction": self._task.instruction,
+                        "platform": platform,
+                    })
+
                 self._publish("cua_step", {
                     "episode_id": self._episode_id,
                     "step": step_idx,
@@ -379,13 +408,30 @@ class CUAEpisodeRunner:
     def run_sync(self) -> CUAEpisodeResult:
         """Synchronous wrapper around :meth:`run`.
 
-        Calls ``asyncio.run(self.run())`` so that the caller does not need
-        to manage an event loop.  Do not use this inside an already-running
-        event loop; call ``await runner.run()`` instead.
+        Works both from a plain script (``asyncio.run``) and from inside
+        an already-running event loop such as Jupyter/IPython (uses
+        ``nest_asyncio`` as fallback).
 
         Returns:
             :class:`CUAEpisodeResult` with the episode outcome and metadata.
         """
+        try:
+            asyncio.get_running_loop()
+            # We're inside a running loop (e.g. Jupyter).  Patch the loop
+            # so asyncio.run() can be re-entered.
+            try:
+                import nest_asyncio  # type: ignore[import-untyped]
+            except ModuleNotFoundError:
+                raise RuntimeError(
+                    "run_sync() was called from an already-running event loop "
+                    "(e.g. Jupyter). Install nest_asyncio to fix this:\n"
+                    "  pip install nest_asyncio"
+                ) from None
+            nest_asyncio.apply()
+        except RuntimeError as exc:
+            if "nest_asyncio" in str(exc) or "run_sync()" in str(exc):
+                raise
+            # No running loop -- asyncio.run() will work normally.
         return asyncio.run(self.run())
 
     # ------------------------------------------------------------------

@@ -13,9 +13,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { NoVNCViewer } from "@/components/NoVNCViewer";
+import { ScreenStreamViewer } from "@/components/ScreenStreamViewer";
 import { CUAActivityPanel } from "@/components/CUAActivityPanel";
 import { useCUAStream } from "@/hooks/useCUAStream";
-import { fetchCUAEpisodeDetail, type CUAEpisodeInfo } from "@/lib/api";
+import { fetchCUAEpisodeDetail, cuaScreenStreamUrl, type CUAEpisodeInfo } from "@/lib/api";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -37,8 +38,12 @@ export default function CUALiveView() {
   const location = useLocation();
   const episodeId = id ?? "";
 
-  // VNC URL passed from launcher via navigation state
-  const vncUrl = (location.state as { vncUrl?: string } | null)?.vncUrl ?? "";
+  // Connection info passed from launcher via navigation state
+  const navState = location.state as {
+    vncUrl?: string;
+    platform?: string;
+  } | null;
+  const vncUrl = navState?.vncUrl ?? "";
 
   // Connection state
   const [connected, setConnected] = useState(false);
@@ -46,6 +51,11 @@ export default function CUALiveView() {
   // Episode info state
   const [episodeInfo, setEpisodeInfo] = useState<CUAEpisodeInfo | null>(null);
   const [complete, setComplete] = useState(false);
+
+  // Platform detection: from nav state first, then from polled episode info
+  const isWindows =
+    navState?.platform === "windows" ||
+    episodeInfo?.platform === "windows";
 
   // Toolbar state
   const [viewOnly, setViewOnly] = useState(true);
@@ -255,7 +265,8 @@ export default function CUALiveView() {
         <div className="flex h-full">
           {/* Desktop viewer panel */}
           <div className="flex-1 min-w-0 relative">
-            {episodeId && wsUrl && (
+            {/* Linux: noVNC viewer */}
+            {episodeId && !isWindows && wsUrl && (
               <NoVNCViewer
                 wsUrl={wsUrl}
                 viewOnly={viewOnly}
@@ -265,7 +276,18 @@ export default function CUALiveView() {
               />
             )}
 
-            {episodeId && !wsUrl && (
+            {/* Windows: live screenshot stream */}
+            {episodeId && isWindows && (
+              <ScreenStreamViewer
+                wsUrl={cuaScreenStreamUrl(episodeId)}
+                onConnect={() => setConnected(true)}
+                onDisconnect={() => setConnected(false)}
+                className="w-full h-full"
+              />
+            )}
+
+            {/* Fallback: no viewer available */}
+            {episodeId && !isWindows && !wsUrl && (
               <div className="flex h-full items-center justify-center">
                 <div className="text-center space-y-2">
                   <p className="text-sm font-medium">

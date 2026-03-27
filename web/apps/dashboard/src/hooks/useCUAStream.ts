@@ -28,6 +28,8 @@ export interface CUAEvent {
   durationMs: number | null;
   /** Error message (end events only) */
   error: string | null;
+  /** Screenshot URL for this step */
+  screenshotUrl: string | null;
 }
 
 export interface UseCUAStreamReturn {
@@ -81,9 +83,11 @@ export function useCUAStream(episodeId: string | null): UseCUAStreamReturn {
         stepCount: null,
         durationMs: null,
         error: null,
+        screenshotUrl: null,
       };
     } else if (last.type === "cua_step") {
       const step = (payload["step"] as number) ?? 0;
+      const screenshotFile = `step_${String(step).padStart(3, "0")}.jpg`;
       event = {
         id: `step-${step}`,
         type: "step",
@@ -98,6 +102,7 @@ export function useCUAStream(episodeId: string | null): UseCUAStreamReturn {
         stepCount: null,
         durationMs: null,
         error: null,
+        screenshotUrl: `/api/cua/episodes/${episodeId}/screenshots/${screenshotFile}`,
       };
     } else if (last.type === "cua_episode_end") {
       event = {
@@ -113,6 +118,7 @@ export function useCUAStream(episodeId: string | null): UseCUAStreamReturn {
         stepCount: (payload["step_count"] as number) ?? null,
         durationMs: (payload["duration_ms"] as number) ?? null,
         error: (payload["error"] as string) ?? null,
+        screenshotUrl: null,
       };
     }
 
