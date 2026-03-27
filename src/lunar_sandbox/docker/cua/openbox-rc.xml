@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Minimal Openbox config for CUA container -->
-<!-- Clean, neutral Clearlooks theme; focus follows mouse; no animations -->
+<!-- Openbox config for CUA container -->
+<!-- Clearlooks theme; focus follows mouse; right-click desktop menu; keyboard shortcuts -->
 <openbox_config xmlns="http://openbox.org/3.4/rc"
                 xmlns:xi="http://www.w3.org/2001/XInclude">
 
@@ -56,13 +56,18 @@
     <primaryMonitor>1</primaryMonitor>
   </placement>
 
+  <!-- ── Root menu (right-click on desktop) ─────────────────────────── -->
+  <menu>
+    <file>menu.xml</file>
+  </menu>
+
   <applications>
   </applications>
 
   <keyboard>
     <chainQuitKey>C-g</chainQuitKey>
 
-    <!-- Basic window management: Alt+F4 to close -->
+    <!-- Alt+F4 to close window -->
     <keybind key="A-F4">
       <action name="Close"/>
     </keybind>
@@ -138,8 +143,13 @@
         <action name="Raise"/>
       </mousebind>
     </context>
-    <context name="Desktop">
-      <!-- No right-click menu on desktop -->
+    <context name="Root">
+      <!-- Right-click on desktop opens the applications menu -->
+      <mousebind button="Right" action="Press">
+        <action name="ShowMenu">
+          <menu>root-menu</menu>
+        </action>
+      </mousebind>
     </context>
   </mouse>
 

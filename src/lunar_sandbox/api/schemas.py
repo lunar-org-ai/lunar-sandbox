@@ -292,6 +292,12 @@ class CUALaunchRequest(BaseModel):
     reward_type: str = "manual"  # "manual", "script", "screenshot_match"
     agent_mode: str = "manual"  # "manual" (keep alive for user) or "model" (AI-driven)
     api_key: str | None = None  # Anthropic API key (falls back to ANTHROPIC_API_KEY env var)
+    # Model provider: "anthropic" (default) or "azure_openai"
+    model_provider: str = "anthropic"
+    # Azure OpenAI settings (used when model_provider="azure_openai")
+    azure_openai_endpoint: str | None = None
+    azure_openai_deployment: str | None = None
+    azure_openai_api_key: str | None = None
     start_url: str | None = None
     resolution: str = "1280x800"
     max_steps: int = 1000
@@ -301,13 +307,26 @@ class CUALaunchRequest(BaseModel):
     # Screenshot match fields
     reference_image_url: str | None = None
     screenshot_threshold: float = 0.95
+    # Platform selection: "linux" (Docker, default) or "windows" (VM)
+    platform: str = "linux"
+    # Windows Azure VM settings (used when platform="windows")
+    windows_ssh_host: str | None = None
+    windows_ssh_port: int = 22
+    windows_ssh_user: str = "lunar"
+    windows_ssh_password: str | None = None
+    windows_ssh_key_path: str | None = None
+    # Azure VM execution via az run-command (no SSH for actions).
+    # When set, uses AzureWindowsCUASandbox instead of SSH-based sandbox.
+    windows_azure_resource_group: str | None = None
+    windows_azure_vm_name: str | None = None
 
 
 class CUALaunchResponse(BaseModel):
     """Response after CUA episode launch."""
 
     episode_id: str
-    vnc_url: str  # WebSocket URL for live VNC
+    vnc_url: str  # WebSocket URL for live VNC (Linux) or empty string (Windows)
+    rdp_url: str | None = None  # RDP URL for live viewing (Windows only)
 
 
 class CUAScoreRequest(BaseModel):
@@ -338,3 +357,4 @@ class CUAEpisodeInfo(BaseModel):
     started_at: float = 0.0
     ended_at: float | None = None
     episode_type: str = "cua"
+    platform: str | None = None  # "linux" or "windows"

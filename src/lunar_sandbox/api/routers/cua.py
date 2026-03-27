@@ -26,6 +26,7 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from lunar_sandbox.api.deps import get_engine
 from lunar_sandbox.api.pagination import PaginationParams, pagination_query
@@ -173,24 +174,77 @@ async def launch_cua_episode(
     import uuid
     episode_id = f"cua-ep-{uuid.uuid4().hex[:8]}"
 
-    # -- Create and start CUASandbox ----------------------------------------
-    config = CUASandboxConfig(
-        sandbox_id=episode_id,
-        width=width,
-        height=height,
-        host_vnc_port=host_vnc_port,
-    )
-    sandbox = CUASandbox(config)
+    # -- Create sandbox (Linux Docker or Windows VM) -------------------------
+    sandbox: Any
+    handler: Any = None
+    rdp_url: str | None = None
 
-    try:
-        sandbox.create()
-        sandbox.health_check()
-    except Exception as exc:
-        log.error("cua_sandbox_create_failed", error=str(exc))
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to create CUA sandbox: {exc}",
-        ) from exc
+    if req.platform == "windows":
+        from lunar_sandbox.windows.action_handler import WindowsCUAActionHandler
+        from lunar_sandbox.windows.config import WindowsCUAConfig
+
+        if not req.windows_ssh_host:
+            raise HTTPException(
+                status_code=400,
+                detail="windows_ssh_host is required when platform='windows'",
+            )
+
+        win_config = WindowsCUAConfig(
+            sandbox_id=episode_id,
+            ssh_host=req.windows_ssh_host,
+            ssh_port=req.windows_ssh_port,
+            ssh_user=req.windows_ssh_user,
+            ssh_password=req.windows_ssh_password,
+            ssh_key_path=req.windows_ssh_key_path,
+            width=width,
+            height=height,
+        )
+
+        # Use AzureWindowsCUASandbox when Azure VM fields are provided
+        # (az run-command for actions, SSH for screenshots).
+        # Otherwise fall back to pure SSH-based WindowsCUASandbox.
+        if req.windows_azure_resource_group and req.windows_azure_vm_name:
+            from lunar_sandbox.windows.azure_sandbox import AzureWindowsCUASandbox
+            sandbox = AzureWindowsCUASandbox(
+                win_config,
+                resource_group=req.windows_azure_resource_group,
+                vm_name=req.windows_azure_vm_name,
+            )
+        else:
+            from lunar_sandbox.windows.sandbox import WindowsCUASandbox
+            sandbox = WindowsCUASandbox(win_config)
+
+        try:
+            sandbox.create()
+            sandbox.health_check()
+        except Exception as exc:
+            log.error("windows_sandbox_create_failed", error=str(exc))
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to connect to Windows VM: {exc}",
+            ) from exc
+
+        handler = WindowsCUAActionHandler(sandbox, win_config)
+        rdp_url = win_config.rdp_url
+        host_vnc_port = 0  # No VNC for Windows
+    else:
+        config = CUASandboxConfig(
+            sandbox_id=episode_id,
+            width=width,
+            height=height,
+            host_vnc_port=host_vnc_port,
+        )
+        sandbox = CUASandbox(config)
+
+        try:
+            sandbox.create()
+            sandbox.health_check()
+        except Exception as exc:
+            log.error("cua_sandbox_create_failed", error=str(exc))
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create CUA sandbox: {exc}",
+            ) from exc
 
     # Determine trajectory dir from engine config (may be None)
     trajectory_dir: Path | None = None
@@ -203,12 +257,36 @@ async def launch_cua_episode(
     agent: Any
     if req.agent_mode == "model":
         from lunar_sandbox.cua.model_agent import ModelAgent
+        os_hint = "windows" if req.platform == "windows" else "linux"
+
         try:
-            agent = ModelAgent(
-                instruction=req.instruction,
-                screen_size=(width, height),
-                api_key=req.api_key or None,
-            )
+            if req.model_provider == "azure_openai":
+                from lunar_sandbox.cua.providers.azure_openai import AzureOpenAIProvider
+                if not req.azure_openai_endpoint or not req.azure_openai_deployment:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="azure_openai_endpoint and azure_openai_deployment are "
+                        "required when model_provider='azure_openai'",
+                    )
+                provider = AzureOpenAIProvider(
+                    endpoint=req.azure_openai_endpoint,
+                    deployment=req.azure_openai_deployment,
+                    api_key=req.azure_openai_api_key or None,
+                    instruction=req.instruction,
+                    screen_size=(width, height),
+                    os_hint=os_hint,
+                )
+                agent = ModelAgent(provider=provider)
+            else:
+                # Default: Anthropic
+                from lunar_sandbox.cua.providers.anthropic import AnthropicProvider
+                provider = AnthropicProvider(
+                    instruction=req.instruction,
+                    screen_size=(width, height),
+                    api_key=req.api_key or None,
+                    os_hint=os_hint,
+                )
+                agent = ModelAgent(provider=provider)
         except ValueError as exc:
             raise HTTPException(
                 status_code=400,
@@ -227,6 +305,7 @@ async def launch_cua_episode(
         episode_id=episode_id,
         trajectory_dir=trajectory_dir,
         event_hub=event_hub,
+        handler=handler,
     )
 
     # -- Register episode in module-level registry ---------------------------
@@ -236,6 +315,9 @@ async def launch_cua_episode(
         "host_vnc_port": host_vnc_port,
         "runner_task": None,
         "agent": agent,
+        "rdp_url": rdp_url,
+        "handler": handler,
+        "platform": req.platform,
     }
 
     # -- Start episode runner as background task (do NOT await) -------------
@@ -270,9 +352,12 @@ async def launch_cua_episode(
         host_vnc_port=host_vnc_port,
     )
 
+    vnc_url = f"ws://localhost:{host_vnc_port}" if host_vnc_port else ""
+
     return CUALaunchResponse(
         episode_id=episode_id,
-        vnc_url=f"ws://localhost:{host_vnc_port}",
+        vnc_url=vnc_url,
+        rdp_url=rdp_url,
     )
 
 
@@ -340,21 +425,23 @@ async def get_cua_episode(
             episode_type=ep.get("episode_type", "cua"),
         )
 
-    # Episode may still be running (not yet ingested into DB)
+    # Episode may still be running or recently completed (external episodes)
     entry = _active_episodes.get(episode_id)
     if entry is not None:
         task = entry.get("task")
+        outcome = entry.get("_outcome", "running") if entry.get("_ended") else "running"
         return CUAEpisodeInfo(
             episode_id=episode_id,
             task_name=task.name if task else "",
-            outcome="running",
+            outcome=outcome,
             score=None,
             review_notes=None,
-            step_count=0,
+            step_count=entry.get("_step_count", 0),
             duration_ms=0.0,
             started_at=0.0,
             ended_at=None,
             episode_type="cua",
+            platform=entry.get("platform", "linux"),
         )
 
     raise HTTPException(status_code=404, detail=f"Episode {episode_id} not found")
@@ -379,9 +466,18 @@ async def get_cua_screenshot(
     if trajectory_dir is None:
         raise HTTPException(status_code=503, detail="Trajectory directory not configured")
 
-    screenshot_path = Path(trajectory_dir) / episode_id / "screenshots" / filename
+    # Check multiple locations (notebook may save elsewhere)
+    candidates = [
+        Path(trajectory_dir) / episode_id / "screenshots" / filename,
+        Path("examples/trajectories") / episode_id / "screenshots" / filename,
+    ]
+    screenshot_path = None
+    for c in candidates:
+        if c.exists():
+            screenshot_path = c
+            break
 
-    if not screenshot_path.exists():
+    if screenshot_path is None:
         raise HTTPException(
             status_code=404,
             detail=f"Screenshot {filename} not found for episode {episode_id}",
@@ -536,3 +632,175 @@ async def vnc_proxy(
         except Exception:
             pass
         log.info("vnc_proxy_disconnected", episode_id=episode_id)
+
+
+# ---------------------------------------------------------------------------
+# WebSocket /api/cua/screen/{episode_id} -- Stream screenshots (Windows VMs)
+# ---------------------------------------------------------------------------
+
+_SCREEN_STREAM_FPS = 2  # Target frames per second
+
+
+@router.websocket("/screen/{episode_id}")
+async def screen_stream(
+    websocket: WebSocket,
+    episode_id: str,
+) -> None:
+    """Stream live screenshots from a Windows VM over WebSocket.
+
+    Sends JSON messages with ``{"type": "frame", "data": "<base64 jpeg>"}``
+    at ~2 FPS.  The handler's screenshot method is called in a thread pool
+    to avoid blocking the event loop (it executes SSH commands).
+    """
+    await websocket.accept()
+
+    entry = _active_episodes.get(episode_id)
+    if entry is None:
+        await websocket.close(code=4404, reason=f"Episode {episode_id} not active")
+        return
+
+    handler = entry.get("handler")
+    is_external = entry.get("_external", False)
+
+    log.info("screen_stream_connected", episode_id=episode_id, external=is_external)
+
+    loop = asyncio.get_event_loop()
+
+    if handler and not is_external:
+        # In-process episode: capture live screenshots via handler
+        interval = 1.0 / _SCREEN_STREAM_FPS
+        try:
+            while True:
+                if episode_id not in _active_episodes:
+                    await websocket.send_json({"type": "ended"})
+                    break
+                try:
+                    b64_data = await loop.run_in_executor(
+                        None,
+                        lambda: handler.screenshot(wait_for_idle=0.1),
+                    )
+                    await websocket.send_json({"type": "frame", "data": b64_data})
+                except Exception as exc:
+                    log.warning(
+                        "screen_stream_capture_error",
+                        episode_id=episode_id,
+                        error=str(exc),
+                    )
+                    await websocket.send_json({"type": "error", "message": str(exc)})
+                await asyncio.sleep(interval)
+        except WebSocketDisconnect:
+            pass
+    else:
+        # External episode (notebook): watch screenshot files on disk
+        import base64
+
+        # Check multiple possible trajectory locations (notebook may run
+        # from a different working directory than the API server)
+        candidates = [
+            Path("trajectories") / episode_id / "screenshots",
+            Path("examples/trajectories") / episode_id / "screenshots",
+        ]
+        # Also check the engine's configured trajectory dir
+        engine = getattr(websocket.app.state, "engine", None)
+        if engine and hasattr(engine, "_config") and engine._config:
+            cfg_td = getattr(engine._config, "trajectory_dir", None)
+            if cfg_td:
+                candidates.insert(0, Path(cfg_td) / episode_id / "screenshots")
+
+        traj_dir: Path | None = None
+        for c in candidates:
+            if c.exists():
+                traj_dir = c
+                break
+        if traj_dir is None:
+            traj_dir = candidates[0]  # default, will be checked in the loop
+        seen_files: set[str] = set()
+
+        try:
+            while True:
+                if episode_id not in _active_episodes:
+                    await websocket.send_json({"type": "ended"})
+                    break
+
+                # Check for new screenshot files
+                if traj_dir.exists():
+                    files = sorted(traj_dir.glob("step_*.jpg"))
+                    for f in files:
+                        if f.name not in seen_files:
+                            seen_files.add(f.name)
+                            b64_data = base64.b64encode(f.read_bytes()).decode("ascii")
+                            await websocket.send_json({"type": "frame", "data": b64_data})
+
+                await asyncio.sleep(1.0)
+        except WebSocketDisconnect:
+            pass
+
+    log.info("screen_stream_disconnected", episode_id=episode_id)
+
+
+# ---------------------------------------------------------------------------
+# POST /api/cua/events -- Publish a CUA event (for external runners)
+# ---------------------------------------------------------------------------
+
+
+class CUAEventPayload(BaseModel):
+    """Event posted by external runners (e.g. notebooks) to the dashboard."""
+    type: str  # "cua_episode_start", "cua_step", "cua_episode_end"
+    topic: str  # "cua:<episode_id>"
+    payload: dict[str, Any]
+
+
+@router.post("/events", status_code=204)
+async def post_cua_event(
+    request: Request,
+    event: CUAEventPayload,
+) -> None:
+    """Publish a CUA event to the WebSocket event hub.
+
+    Allows external episode runners (notebooks, CLI) to push events
+    to the dashboard's live activity panel without running inside
+    the API server process.
+
+    Also registers external episodes in ``_active_episodes`` so the
+    episode detail endpoint returns "running" instead of 404.
+    """
+    # Extract episode_id from topic ("cua:<episode_id>")
+    episode_id = event.topic.split(":", 1)[-1] if ":" in event.topic else ""
+
+    # Register external episode so GET /episodes/{id} works
+    if episode_id and episode_id not in _active_episodes:
+        _active_episodes[episode_id] = {
+            "sandbox": None,
+            "task": None,
+            "host_vnc_port": 0,
+            "runner_task": None,
+            "agent": None,
+            "rdp_url": None,
+            "handler": None,
+            "platform": event.payload.get("platform", "windows"),
+            "_external": True,  # marker for externally-launched episodes
+        }
+
+    # Update platform if provided in payload
+    entry = _active_episodes.get(episode_id)
+    if entry and event.payload.get("platform"):
+        entry["platform"] = event.payload["platform"]
+
+    # When episode ends, update the entry but keep it for 60s
+    # so the dashboard can still fetch info and screenshots.
+    if event.type == "cua_episode_end" and episode_id:
+        entry = _active_episodes.get(episode_id)
+        if entry:
+            entry["_ended"] = True
+            entry["_outcome"] = event.payload.get("outcome", "completed")
+            entry["_step_count"] = event.payload.get("step_count", 0)
+
+            async def _cleanup_later(eid: str) -> None:
+                await asyncio.sleep(60)
+                _active_episodes.pop(eid, None)
+
+            asyncio.ensure_future(_cleanup_later(episode_id))
+
+    event_hub = getattr(request.app.state, "event_hub", None)
+    if event_hub is not None:
+        event_hub.publish_event(event.type, event.topic, event.payload)

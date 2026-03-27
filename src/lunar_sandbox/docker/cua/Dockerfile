@@ -1,10 +1,13 @@
-FROM ubuntu:22.04
+FROM debian:bookworm-slim
 
 # ── Build-time env ────────────────────────────────────────────────────────────
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DISPLAY=:1
 
 # ── Install all packages in a single layer to minimize image size ─────────────
+# Using Debian bookworm instead of Ubuntu 22.04 because Ubuntu's chromium-browser
+# is a snap stub that doesn't work inside Docker containers.
+# Debian ships real Chromium packages for both amd64 and arm64.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # X11 virtual display and utilities
     xvfb \
@@ -17,8 +20,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xdotool \
     # Screenshot capture (stdout mode + JPEG quality flag)
     maim \
-    # Browser (primary for CUA tasks)
-    chromium-browser \
+    # Browser (real package, not a snap stub)
+    chromium \
     # Desktop applications
     lxterminal \
     mousepad \
@@ -41,14 +44,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     bc \
     # noVNC static assets (served by websockify)
     novnc \
-    && pip3 install --no-cache-dir websockify \
+    && pip3 install --break-system-packages --no-cache-dir websockify \
     # Clean up apt cache in the same layer
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # ── Chromium wrapper script ───────────────────────────────────────────────────
 # Bakes in required flags for Docker (no-sandbox, disable-gpu, disable-dev-shm-usage)
-RUN printf '#!/bin/bash\nexec chromium-browser --no-sandbox --disable-gpu --disable-dev-shm-usage "$@"\n' \
+RUN printf '#!/bin/bash\nexec chromium --no-sandbox --disable-gpu --disable-dev-shm-usage "$@"\n' \
     > /usr/local/bin/chromium-browser-wrapper \
     && chmod +x /usr/local/bin/chromium-browser-wrapper
 
@@ -68,6 +71,7 @@ RUN chmod +x \
 
 # ── Copy Openbox configuration ────────────────────────────────────────────────
 COPY openbox-rc.xml /etc/xdg/openbox/rc.xml
+COPY menu.xml       /etc/xdg/openbox/menu.xml
 
 # ── Entrypoint ────────────────────────────────────────────────────────────────
 # The entrypoint starts Xvfb -> Openbox -> x11vnc -> websockify then keeps

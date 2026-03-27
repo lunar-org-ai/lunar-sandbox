@@ -1,11 +1,33 @@
-"""Model-driven CUA agent using Claude's computer-use capability.
+"""Model-driven CUA agent with pluggable model providers.
 
-Calls the Anthropic Messages API directly via httpx — no SDK dependency.
-The agent sends each screenshot to Claude and receives computer-use tool
-calls (click, type, key, scroll, etc.) which map directly to the action
-dict format expected by CUAActionHandler.
+Accepts any :class:`ModelProvider` (Anthropic, Azure OpenAI, etc.)
+and translates model responses into action dicts for the CUA action
+handler.
 
-Requires ANTHROPIC_API_KEY in environment.
+No SDK dependencies -- all providers use httpx directly.
+
+Usage::
+
+    # Default (Anthropic)
+    agent = ModelAgent(
+        instruction="Open the calculator",
+        screen_size=(1280, 800),
+    )
+
+    # Explicit Anthropic provider
+    from lunar_sandbox.cua.providers import AnthropicProvider
+    provider = AnthropicProvider(instruction="...", screen_size=(1280, 800))
+    agent = ModelAgent(provider=provider)
+
+    # Azure OpenAI provider
+    from lunar_sandbox.cua.providers import AzureOpenAIProvider
+    provider = AzureOpenAIProvider(
+        endpoint="https://my-resource.openai.azure.com",
+        deployment="computer-use-preview",
+        instruction="...",
+        screen_size=(1280, 800),
+    )
+    agent = ModelAgent(provider=provider)
 """
 
 from __future__ import annotations
@@ -13,7 +35,6 @@ from __future__ import annotations
 import os
 from typing import Any
 
-import httpx
 import structlog
 
 from lunar_sandbox.cua.observation import CUAObservation
@@ -22,44 +43,49 @@ __all__ = ["ModelAgent"]
 
 log = structlog.get_logger(__name__)
 
-_API_URL = "https://api.anthropic.com/v1/messages"
-_DEFAULT_MODEL = "claude-sonnet-4-20250514"
-
 
 class ModelAgent:
-    """CUA agent that uses a multimodal Claude model to decide actions.
+    """CUA agent that uses a model provider to decide actions.
 
-    Each call sends the current screenshot to Claude with the task
-    instruction and conversation history. Claude responds with
-    computer-use tool calls that are translated into action dicts.
+    Can be used with any :class:`ModelProvider` implementation. If no
+    provider is passed, creates an :class:`AnthropicProvider` from the
+    legacy constructor arguments for backward compatibility.
 
     Args:
-        instruction: The task instruction shown to the model.
-        screen_size: Display resolution as (width, height).
-        model: Anthropic model ID to use.
-        api_key: Anthropic API key. Falls back to ANTHROPIC_API_KEY env var.
+        provider: A :class:`ModelProvider` instance. If provided, all
+            other arguments are ignored.
+        instruction: Task instruction (used to create default provider).
+        screen_size: Display resolution (used to create default provider).
+        model: Model ID (used to create default Anthropic provider).
+        api_key: API key (used to create default Anthropic provider).
+        os_hint: Target OS (used to create default provider).
     """
 
     def __init__(
         self,
-        instruction: str,
+        provider: Any | None = None,
+        *,
+        instruction: str = "",
         screen_size: tuple[int, int] = (1280, 800),
-        model: str = _DEFAULT_MODEL,
+        model: str = "claude-sonnet-4-20250514",
         api_key: str | None = None,
+        os_hint: str = "linux",
     ) -> None:
-        self._instruction = instruction
-        self._screen_size = screen_size
-        self._model = model
-        self._api_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
-        if not self._api_key:
-            raise ValueError(
-                "ANTHROPIC_API_KEY is required. Set it as an environment "
-                "variable or pass api_key to ModelAgent."
+        if provider is not None:
+            self._provider = provider
+        else:
+            # Backward compatibility: create AnthropicProvider from args
+            from lunar_sandbox.cua.providers.anthropic import AnthropicProvider
+
+            self._provider = AnthropicProvider(
+                instruction=instruction,
+                screen_size=screen_size,
+                model=model,
+                api_key=api_key,
+                os_hint=os_hint,
             )
-        self._messages: list[dict[str, Any]] = []
-        self._pending_tool_use_id: str | None = None
-        self._client = httpx.AsyncClient(timeout=60.0)
-        self.last_reasoning: str | None = None  # Text reasoning from the last response
+
+        self.last_reasoning: str | None = None
 
     async def __call__(self, obs: CUAObservation) -> dict[str, Any]:
         """Process an observation and return the next action.
@@ -70,170 +96,13 @@ class ModelAgent:
         Returns:
             Action dict compatible with CUAActionHandler.execute_action().
         """
-        # Build the user message content
-        content: list[dict[str, Any]] = []
+        response = await self._provider(obs)
 
-        # If the previous response had a tool_use, we must send a tool_result
-        if self._pending_tool_use_id:
-            tool_result_content: list[dict[str, Any]] = []
-            if obs.screenshot_b64:
-                tool_result_content.append({
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "image/jpeg",
-                        "data": obs.screenshot_b64,
-                    },
-                })
-            if obs.error_message:
-                tool_result_content.append({
-                    "type": "text",
-                    "text": f"Error: {obs.error_message}",
-                })
-            if not tool_result_content:
-                tool_result_content.append({"type": "text", "text": "Action executed."})
+        self.last_reasoning = response.reasoning
 
-            content.append({
-                "type": "tool_result",
-                "tool_use_id": self._pending_tool_use_id,
-                "content": tool_result_content,
-            })
-            self._pending_tool_use_id = None
-        else:
-            # First message or after a non-tool response
-            if obs.screenshot_b64:
-                content.append({
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": "image/jpeg",
-                        "data": obs.screenshot_b64,
-                    },
-                })
-            if obs.error_message:
-                content.append({
-                    "type": "text",
-                    "text": f"Error from previous action: {obs.error_message}",
-                })
-            if not content:
-                content.append({"type": "text", "text": "What should I do next?"})
-
-        self._messages.append({"role": "user", "content": content})
-
-        # Call Claude API
-        response = await self._call_api()
-
-        # Add assistant response to conversation history
-        self._messages.append({
-            "role": "assistant",
-            "content": response.get("content", []),
-        })
-
-        # Parse the response and track tool_use IDs for the next turn
-        action = self._parse_response(response)
-
-        log.debug("model_agent_action", action=action.get("action"))
-        return action
-
-    async def _call_api(self) -> dict[str, Any]:
-        """Make a raw HTTP call to the Anthropic Messages API."""
-        w, h = self._screen_size
-
-        payload = {
-            "model": self._model,
-            "max_tokens": 1024,
-            "system": (
-                f"You are a computer-use agent. Your task: {self._instruction}\n\n"
-                f"The screen resolution is {w}x{h}. "
-                "You are controlling a Linux desktop with Openbox window manager. "
-                "To open applications, RIGHT-CLICK on the desktop to get the Openbox menu, "
-                "then navigate the menu to find and launch applications. "
-                "Available apps include: Chromium (web browser), LXTerminal, "
-                "Mousepad (text editor), PCManFM (file manager), and Galculator (calculator). "
-                "Use the computer tool to interact with the desktop. "
-                "Be precise with coordinates when clicking. "
-                "When the task is complete, respond with a text message "
-                "containing the word DONE (do not use the computer tool)."
-            ),
-            "tools": [
-                {
-                    "type": "computer_20250124",
-                    "name": "computer",
-                    "display_width_px": w,
-                    "display_height_px": h,
-                    "display_number": 1,
-                },
-            ],
-            "messages": self._messages,
-        }
-
-        headers = {
-            "x-api-key": self._api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-            "anthropic-beta": "computer-use-2025-01-24",
-        }
-
-        resp = await self._client.post(_API_URL, json=payload, headers=headers)
-
-        if resp.status_code != 200:
-            log.error(
-                "model_agent_api_error",
-                status=resp.status_code,
-                body=resp.text[:500],
-            )
-            raise RuntimeError(
-                f"Anthropic API returned {resp.status_code}: {resp.text[:200]}"
-            )
-
-        return resp.json()
-
-    def _parse_response(self, response: dict[str, Any]) -> dict[str, Any]:
-        """Extract an action dict from the Claude API response.
-
-        Looks for a computer-use tool_use block. If Claude responds with
-        only text (no tool call), treats it as a stop signal.
-        """
-        # Capture any text reasoning from the response
-        reasoning_parts = []
-        for block in response.get("content", []):
-            if block.get("type") == "text" and block.get("text"):
-                reasoning_parts.append(block["text"])
-        self.last_reasoning = "\n".join(reasoning_parts) if reasoning_parts else None
-
-        for block in response.get("content", []):
-            if block.get("type") == "tool_use" and block.get("name") == "computer":
-                self._pending_tool_use_id = block.get("id")
-                inp = block.get("input", {})
-                action_type = inp.get("action", "")
-
-                # Map Claude's computer-use actions to our action dict format
-                action: dict[str, Any] = {"action": action_type}
-
-                if "coordinate" in inp:
-                    action["coordinate"] = inp["coordinate"]
-                if "start_coordinate" in inp:
-                    action["start_coordinate"] = inp["start_coordinate"]
-                if "text" in inp:
-                    action["text"] = inp["text"]
-                if "direction" in inp:
-                    action["direction"] = inp["direction"]
-                if "amount" in inp:
-                    action["amount"] = inp["amount"]
-
-                return action
-
-            elif block.get("type") == "text":
-                text = block.get("text", "")
-                if "DONE" in text.upper():
-                    return {"action": "done"}
-
-        # If stop_reason is end_turn with no tool use, treat as done
-        if response.get("stop_reason") == "end_turn":
-            return {"action": "done"}
-
-        return {"action": "screenshot"}
+        log.debug("model_agent_action", action=response.action.get("action"))
+        return response.action
 
     async def close(self) -> None:
-        """Close the underlying HTTP client."""
-        await self._client.aclose()
+        """Close the underlying provider's HTTP client."""
+        await self._provider.close()

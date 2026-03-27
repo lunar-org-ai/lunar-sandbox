@@ -54,7 +54,7 @@ async def list_episodes(
 
     # Sort results
     reverse = sort_order.lower() != "asc"
-    episodes.sort(key=lambda ep: ep.get(sort_by) or 0, reverse=reverse)
+    episodes.sort(key=lambda ep: ep.get(sort_by) if ep.get(sort_by) is not None else "", reverse=reverse)
 
     total = len(episodes)
     page = episodes[pagination.offset : pagination.offset + pagination.limit]

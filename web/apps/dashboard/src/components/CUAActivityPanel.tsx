@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Bot,
+  User,
   MousePointer,
   Keyboard,
   ScrollText,
@@ -10,6 +11,9 @@ import {
   CheckCircle2,
   Clock,
   Sparkles,
+  Eye,
+  ChevronDown,
+  Image as ImageIcon,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +39,7 @@ const ACTION_ICONS: Record<string, typeof MousePointer> = {
   left_click: MousePointer,
   right_click: MousePointer,
   double_click: MousePointer,
+  mouse_move: MousePointer,
   type: Keyboard,
   key: Keyboard,
   scroll: ScrollText,
@@ -52,28 +57,32 @@ function formatActionLabel(action: string, params: Record<string, unknown>): str
     case "click":
     case "left_click":
       return params.coordinate
-        ? `Click at (${(params.coordinate as number[]).join(", ")})`
+        ? `Click (${(params.coordinate as number[]).join(", ")})`
         : "Click";
     case "right_click":
       return params.coordinate
-        ? `Right-click at (${(params.coordinate as number[]).join(", ")})`
+        ? `Right-click (${(params.coordinate as number[]).join(", ")})`
         : "Right-click";
     case "double_click":
       return params.coordinate
-        ? `Double-click at (${(params.coordinate as number[]).join(", ")})`
+        ? `Double-click (${(params.coordinate as number[]).join(", ")})`
         : "Double-click";
+    case "mouse_move":
+      return params.coordinate
+        ? `Move to (${(params.coordinate as number[]).join(", ")})`
+        : "Move";
     case "type":
       return params.text
-        ? `Type "${truncate(params.text as string, 40)}"`
+        ? `Type "${truncate(params.text as string, 30)}"`
         : "Type";
     case "key":
-      return params.key ? `Key: ${params.key}` : "Keystroke";
+      return params.text ? `Key: ${params.text}` : "Keystroke";
     case "scroll":
       return params.coordinate
-        ? `Scroll at (${(params.coordinate as number[]).join(", ")})`
+        ? `Scroll (${(params.coordinate as number[]).join(", ")})`
         : "Scroll";
     case "screenshot":
-      return "Screenshot";
+      return "Take screenshot";
     case "stop":
     case "done":
       return "Task complete";
@@ -83,7 +92,7 @@ function formatActionLabel(action: string, params: Record<string, unknown>): str
 }
 
 function truncate(str: string, max: number): string {
-  return str.length > max ? str.slice(0, max) + "…" : str;
+  return str.length > max ? str.slice(0, max) + "\u2026" : str;
 }
 
 // ---------------------------------------------------------------------------
@@ -95,17 +104,54 @@ function StartEvent({ event }: { event: CUAEvent }) {
     <div className="flex gap-3 px-3 py-3">
       <div className="shrink-0 mt-0.5">
         <div className="size-7 rounded-full bg-primary/10 flex items-center justify-center">
-          <Play className="size-3.5 text-primary" />
+          <User className="size-3.5 text-primary" />
         </div>
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-foreground">Episode started</p>
+        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
+          Task
+        </p>
         {event.instruction && (
-          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-            {event.instruction}
-          </p>
+          <div className="rounded-lg bg-primary/5 border border-primary/10 px-3 py-2">
+            <p className="text-xs text-foreground leading-relaxed">
+              {event.instruction}
+            </p>
+          </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function StepScreenshot({ url }: { url: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) return null;
+
+  return (
+    <div
+      className="cursor-pointer group"
+      onClick={() => setExpanded((v) => !v)}
+    >
+      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-1">
+        <ImageIcon className="size-3" />
+        <span>Screenshot</span>
+        <ChevronDown
+          className={cn(
+            "size-3 transition-transform",
+            expanded && "rotate-180",
+          )}
+        />
+      </div>
+      {expanded && (
+        <img
+          src={url}
+          alt="Step screenshot"
+          className="rounded-md border border-border w-full max-h-48 object-contain bg-black/5"
+          onError={() => setHasError(true)}
+        />
+      )}
     </div>
   );
 }
@@ -113,6 +159,7 @@ function StartEvent({ event }: { event: CUAEvent }) {
 function StepEvent({ event }: { event: CUAEvent }) {
   const ActionIcon = getActionIcon(event.action ?? "");
   const label = formatActionLabel(event.action ?? "", event.actionParams);
+  const hasReasoning = event.reasoning && event.reasoning.trim().length > 0;
 
   return (
     <div className="flex gap-3 px-3 py-3">
@@ -122,28 +169,40 @@ function StepEvent({ event }: { event: CUAEvent }) {
         </div>
       </div>
       <div className="min-w-0 flex-1 space-y-2">
-        {/* Reasoning bubble */}
-        {event.reasoning && (
+        {/* Step header */}
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+            Step {(event.step ?? 0) + 1}
+          </span>
+        </div>
+
+        {/* Reasoning / thinking */}
+        {hasReasoning && (
           <div className="rounded-lg bg-muted/50 border border-border/50 px-3 py-2">
+            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1">
+              Reasoning
+            </p>
             <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
               {event.reasoning}
             </p>
           </div>
         )}
 
-        {/* Action badge */}
+        {/* Action */}
         <div className="flex items-center gap-2">
           <Badge
             variant="outline"
-            className="gap-1 text-[10px] font-mono h-5"
+            className="gap-1.5 text-[10px] font-mono h-5"
           >
             <ActionIcon className="size-2.5" />
             {label}
           </Badge>
-          <span className="text-[10px] text-muted-foreground tabular-nums">
-            Step {(event.step ?? 0) + 1}
-          </span>
         </div>
+
+        {/* Screenshot thumbnail */}
+        {event.screenshotUrl && (
+          <StepScreenshot url={event.screenshotUrl} />
+        )}
       </div>
     </div>
   );
@@ -177,7 +236,7 @@ function EndEvent({ event }: { event: CUAEvent }) {
         <p className="text-xs font-medium text-foreground">
           Episode {event.outcome?.replace(/_/g, " ") ?? "ended"}
         </p>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
           {event.stepCount != null && (
             <span className="text-[10px] text-muted-foreground">
               {event.stepCount} steps
@@ -190,7 +249,9 @@ function EndEvent({ event }: { event: CUAEvent }) {
           )}
         </div>
         {event.error && (
-          <p className="text-xs text-destructive mt-1">{event.error}</p>
+          <div className="rounded-lg bg-destructive/5 border border-destructive/10 px-3 py-2 mt-2">
+            <p className="text-xs text-destructive">{event.error}</p>
+          </div>
         )}
       </div>
     </div>
@@ -241,7 +302,7 @@ export function CUAActivityPanel({ events, isLive }: CUAActivityPanelProps) {
                 <Bot className="size-5 text-muted-foreground" />
               </div>
               <p className="text-xs text-muted-foreground">
-                Waiting for agent activity…
+                Waiting for agent activity...
               </p>
               <p className="text-[10px] text-muted-foreground/70 mt-1">
                 Events will appear here as the model runs
